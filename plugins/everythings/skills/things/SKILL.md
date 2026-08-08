@@ -38,6 +38,23 @@ copy; a connector-declaring artifact cannot be shared by URL.
 
 5. Give the user the artifact link. That is the whole job.
 
+## Surfaces without the Artifact tool (Cowork desktop today)
+
+If this session has no Artifact tool, the panel cannot be published or
+updated from here — do not improvise a substitute page or fork the bundled
+one. Tell the user, in this order:
+
+1. The panel publishes from **Claude Code** (CLI or web) or claude.ai — run
+   `/things` there once; the connector-setup pointer above applies there too.
+2. An **already-published panel keeps working**: opened in any browser at its
+   claude.ai URL with follow mode armed, it jumps to things as they are
+   created — including things this very session writes through the
+   Everythings MCP tools. Publishing surface and watching surface are
+   independent.
+
+The MCP tools themselves work normally on every surface; only the publish
+step needs the Artifact tool.
+
 ## Never open it in a browser
 
 Publishing with the Artifact tool IS opening the panel — it renders in the

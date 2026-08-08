@@ -36,6 +36,14 @@ pick **everythings** under `/plugin install`.)
 Your panel is a private artifact on your claude.ai account — every user
 publishes their own; nothing is shared unless you share it.
 
+## Using Cowork?
+
+The MCP tools work there — a Cowork agent can research and file everything
+into your workspaces. Publishing the panel needs Claude Code (CLI or web) or
+claude.ai, so run `/things` once there, then keep the panel open in a browser
+beside Cowork: with follow mode armed it opens each thing as the Cowork agent
+writes it.
+
 ## Notes
 
 - The panel is read-only and refreshes on a ~30 second poll (the connector
