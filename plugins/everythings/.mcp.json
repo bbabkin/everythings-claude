@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "everythings": {
+      "type": "http",
+      "url": "https://www.everythings.app/api/mcp"
+    }
+  }
+}

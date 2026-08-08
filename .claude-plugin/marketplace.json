@@ -1,0 +1,13 @@
+{
+  "name": "everythings-claude",
+  "owner": {
+    "name": "Boris Babkin"
+  },
+  "plugins": [
+    {
+      "name": "everythings",
+      "source": "./plugins/everythings",
+      "description": "Everythings workspace/thing MCP tools in every project, plus /things: your live Everythings Panel as a claude.ai artifact."
+    }
+  ]
+}
