@@ -488,7 +488,11 @@
     }
     if (code === 'tool_error' || code === 'bad_request' || code === 'transform_error') {
       const slot = document.querySelector('[data-err="' + section + '"]');
-      if (slot) slot.innerHTML = '<div class="secterr">Couldn’t load this section: ' + esc(err.message || code) + '</div>';
+      if (slot) {
+        slot.innerHTML = '<div class="secterr">Couldn’t load this section: ' + esc(err.message || code) + '</div>';
+        // A section hidden while empty (comments) must still surface its error.
+        if (slot.parentElement && slot.parentElement.hidden) slot.parentElement.hidden = false;
+      }
       return;
     }
     // Transient (server_unavailable, rate_limited, upstream_error, unknown):
@@ -688,8 +692,8 @@
       '<div class="prose" id="dContent"></div><div data-err="thing"></div>' +
       '<div class="sect-label">Inside <span class="cnt" id="dChildCount"></span></div>' +
       '<div id="dChildren">' + skeletonGrid(4) + '</div><div data-err="children"></div>' +
-      '<div class="sect-label">Comments <span class="cnt" id="dCommentCount"></span></div>' +
-      '<div id="dComments"></div><div data-err="comments"></div>';
+      '<div id="dCommentsSect" hidden><div class="sect-label">Comments <span class="cnt" id="dCommentCount"></span></div>' +
+      '<div id="dComments"></div><div data-err="comments"></div></div>';
 
     const crumbs = $('crumbs');
     crumbs.appendChild(crumbBtn(ws ? ws.name : 'Workspace', openGrid));
@@ -755,7 +759,8 @@
       if (!changed('comments', all)) return;
       $('dCommentCount').textContent = p.count ? '— ' + p.count : '';
       const slot = $('dComments');
-      if (!all.length) { slot.innerHTML = '<div class="empty">No comments.</div>'; return; }
+      $('dCommentsSect').hidden = !all.length;
+      if (!all.length) { slot.innerHTML = ''; return; }
       slot.innerHTML = '';
       const roots = all.filter((c) => !c.parentId);
       const byParent = new Map();
