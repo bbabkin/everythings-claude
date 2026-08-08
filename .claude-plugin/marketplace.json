@@ -1,5 +1,8 @@
 {
   "name": "everythings-claude",
+  "metadata": {
+    "description": "Everythings for Claude Code: workspace/thing MCP tools plus /things, your live panel artifact."
+  },
   "owner": {
     "name": "Boris Babkin"
   },
