@@ -42,3 +42,9 @@ publishes their own; nothing is shared unless you share it.
   platform's floor).
 - Panel improvements ship with plugin updates; running `/things` after an
   update republishes the new page to your same URL.
+
+## License
+
+MIT (see [LICENSE](LICENSE)). The Everythings name and logo remain trademarks
+of their owner; the bundled Montserrat font is used under the SIL Open Font
+License.
