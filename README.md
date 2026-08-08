@@ -28,8 +28,9 @@ pick **everythings** under `/plugin install`.)
 1. An account at [everythings.app](https://everythings.app) (free tier works).
 2. On first MCP use, Claude Code walks you through the OAuth sign-in to
    `https://www.everythings.app/api/mcp`.
-3. For the panel: add the same URL as a custom connector in claude.ai
-   **Settings → Connectors** (keep the name **Everythings**), then run
+3. For the panel: in claude.ai **Settings → Connectors**, find
+   **Everythings** in the connector directory and connect it (or add the same
+   URL as a custom connector; keep the name **Everythings**), then run
    `/things`.
 
 Your panel is a private artifact on your claude.ai account — every user

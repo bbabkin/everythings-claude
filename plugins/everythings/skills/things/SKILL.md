@@ -50,9 +50,10 @@ else it shows only its "Open this page from claude.ai" banner.
 
 The page banners "Everythings isn't connected" when the viewer has no
 Everythings connector. Walk them through it: claude.ai **Settings →
-Connectors → Add custom connector**, URL `https://www.everythings.app/api/mcp`
-(sign-in happens in the browser; keep the default display name
-**Everythings**). Then reload the panel.
+Connectors**, find **Everythings** in the connector directory and click
+Connect (fallback for builds without the directory: **Add custom connector**
+with URL `https://www.everythings.app/api/mcp`). Sign-in happens in the
+browser; keep the display name **Everythings**. Then reload the panel.
 
 ## Do not modify the bundled page
 
