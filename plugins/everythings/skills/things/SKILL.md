@@ -91,7 +91,9 @@ skill's job is only to note it, never to fork the page.
   the connector contract's floor, so "live" means within half a minute.
 - The radar toggle arms **follow mode**: any thing created or updated after
   arming opens automatically (workspace switch and breadcrumbs included) — the
-  way to watch an agent build things in real time. Manual navigation pauses
-  it; it is off on every load.
+  way to watch an agent build things in real time. When the agent keeps
+  writing into the thing already open, its text updates in place instead of
+  re-opening, landing in ~15 s on average. Manual navigation pauses follow; it
+  is off on every load.
 - Read-only today: marks and comments display, but writing them stays in the
   app.

@@ -363,12 +363,24 @@
   const SERVER = 'Everythings';
   const APP_URL = 'https://everythings.app';
   const POLL = 30000;
+  // Declared polling for the live surfaces (followed thing, activity feed).
+  // The runtime clamps refetchInterval to a ~30 s floor today, so this asks
+  // for the fastest cadence allowed and picks up anything faster for free if
+  // the floor ever drops. Sub-floor freshness comes from invalidateThing()
+  // below — change-triggered, never a timer.
+  const POLL_FAST = 15000;
   // Long-lived cache: watchTool replays the stored entry instantly on
   // (re)registration and still refreshes once it is past staleTime, so a
   // day-long gcTime makes reopening the panel paint from last-good data at
   // once instead of a skeleton. staleTime above POLL keeps grid<->thing
   // navigation from re-executing reads the 30 s poll just refreshed.
   const CACHE = { staleTime: 60000, gcTime: 86400000 };
+  // Thing-detail reads: replay the stored entry instantly (same day-long
+  // gcTime) but never serve it without refreshing. staleTime 0 matters while
+  // following — a thing whose text an agent is still filling in must not be
+  // answered from a copy taken seconds ago.
+  const LIVE_CACHE = { staleTime: 0, gcTime: 86400000 };
+  const LIVE_OPTS = { cache: LIVE_CACHE, refetchInterval: POLL_FAST };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -698,7 +710,7 @@
       $('dName').textContent = p.name || t.name;
       state.view.name = p.name || t.name;
       $('dContent').innerHTML = p.content ? mdRender(p.content) : '';
-    }, 'thing'));
+    }, 'thing', LIVE_OPTS));
 
     subs.scoped.push(watch('list_child_things', { parentId: t.id, limit: 200 }, (p) => {
       if (!state.view || state.view.id !== t.id) return;
@@ -720,7 +732,7 @@
       }
       slot.innerHTML = '';
       slot.appendChild(grid);
-    }, 'children'));
+    }, 'children', LIVE_OPTS));
 
     subs.scoped.push(watch('list_marks', { thingId: t.id }, (p) => {
       if (!state.view || state.view.id !== t.id) return;
@@ -735,7 +747,7 @@
         chip.title = (m.users || []).join(', ');
         row.appendChild(chip);
       }
-    }, 'marks'));
+    }, 'marks', LIVE_OPTS));
 
     subs.scoped.push(watch('list_comments', { thingId: t.id, limit: 200 }, (p) => {
       if (!state.view || state.view.id !== t.id) return;
@@ -762,7 +774,7 @@
         for (const r of byParent.get(c.id) || []) renderComment(r, true);
       };
       for (const c of roots) renderComment(c, false);
-    }, 'comments'));
+    }, 'comments', LIVE_OPTS));
   }
 
   // ---------------------------------------------------------------- markdown (GFM subset)
@@ -931,10 +943,11 @@
   // ---------------------------------------------------------------- follow
   // Follow mode: while armed, the panel follows activity — a thing created or
   // updated after arming (typically an agent writing through MCP) opens
-  // automatically, switching workspace when needed. Pull-only: it rides a
-  // recent_things watch at the contract's ~30 s polling floor, so jumps land
-  // within half a minute of the write, and a burst of writes lands on the
-  // newest. The first delivery after arming only sets the baseline — server
+  // automatically, switching workspace when needed; an update to the thing
+  // already open refreshes its text in place. Pull-only: it rides a
+  // recent_things watch at the contract's ~30 s polling floor, so a jump
+  // lands within half a minute of the write and a burst lands on the newest.
+  // The first delivery after arming only sets the baseline — server
   // timestamps compare against server timestamps, never the local clock.
   function userNav() {
     if (!state.follow) return;
@@ -965,8 +978,23 @@
       if (!next) return;
       state.followSeen = next.ts;
       const open = state.view && state.view.type === 'thing' ? state.view.id : null;
-      if (next.t.id !== open) followJump(next.t);
-    }, 'follow', { cache: { staleTime: 0, gcTime: 0 } }));
+      // An agent still filling in the open thing: refresh it in place rather
+      // than re-opening it. This feed and the thing's own watch poll on
+      // independent cycles, so invalidating here delivers the new text on
+      // whichever fires first — roughly halving the wait a single poll would
+      // impose, without a timer of our own.
+      if (next.t.id === open) { invalidateThing(); return; }
+      followJump(next.t);
+    }, 'follow', { cache: { staleTime: 0, gcTime: 0 }, refetchInterval: POLL_FAST }));
+  }
+
+  // Drop the cached thing-scoped reads so the open thing's watches re-execute
+  // and deliver now. Only registered watches re-execute, so this costs one
+  // flight per visible section and only when the feed reported a real change.
+  function invalidateThing() {
+    for (const tool of ['get_thing', 'list_child_things', 'list_comments', 'list_marks']) {
+      try { Promise.resolve(mcp.invalidate(SERVER, tool)).catch(() => {}); } catch { /* old shell */ }
+    }
   }
 
   async function followJump(t) {
