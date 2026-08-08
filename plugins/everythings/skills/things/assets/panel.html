@@ -426,7 +426,7 @@
     view: null,            // {type:'grid'} | {type:'thing', id, name, emoji, trail:[{id,name,emoji}]}
     autoWs: true,          // false once the user picks a workspace themselves
     noBoot: false,         // true once the server proves it lacks the bootstrap tool
-    follow: false,         // follow mode: auto-open things as activity happens
+    follow: false,         // follow mode: auto-open things as activity happens (boot arms it)
     followSeen: null,      // newest server updatedAt handled (null until baselined)
     gridPrev: null,        // map id -> {name, emoji} of last grid delivery
     childPrev: null,
@@ -941,8 +941,9 @@
   }
 
   // ---------------------------------------------------------------- follow
-  // Follow mode: while armed, the panel follows activity — a thing created or
-  // updated after arming (typically an agent writing through MCP) opens
+  // Follow mode: armed from the moment the panel opens (see boot) and left to
+  // the header toggle after that. While armed the panel follows activity — a
+  // thing created or updated after arming (typically an agent writing) opens
   // automatically, switching workspace when needed; an update to the thing
   // already open refreshes its text in place. Pull-only: it rides a
   // recent_things watch at the contract's ~30 s polling floor, so a jump
@@ -1077,6 +1078,14 @@
     // sits in thing views, where no bootstrap watch is registered; also the
     // whole landing path when the server lacks the bootstrap tool.
     subs.base.push(watch('list_workspaces', null, handleWorkspaces, 'workspaces', { refetchInterval: 120000 }));
+
+    // Armed on every load. Watching an agent write is what the panel is for,
+    // and by the time someone opens it the agent is usually already working —
+    // an off-by-default toggle just costs them the first few things. Arming
+    // only baselines against the newest server timestamp, so nothing jumps
+    // until something is written after this moment; a manual tile/crumb/
+    // workspace click still pauses it, and the toggle stops it for good.
+    setFollow(true);
   }
 
   boot();

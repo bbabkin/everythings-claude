@@ -47,10 +47,10 @@ one. Tell the user, in this order:
 1. The panel publishes from **Claude Code** (CLI or web) or claude.ai — run
    `/things` there once; the connector-setup pointer above applies there too.
 2. An **already-published panel keeps working**: opened in any browser at its
-   claude.ai URL with follow mode armed, it jumps to things as they are
-   created — including things this very session writes through the
-   Everythings MCP tools. Publishing surface and watching surface are
-   independent.
+   claude.ai URL it jumps to things as they are created (follow mode is on
+   from the moment it loads) — including things this very session writes
+   through the Everythings MCP tools. Publishing surface and watching surface
+   are independent.
 
 The MCP tools themselves work normally on every surface; only the publish
 step needs the Artifact tool.
@@ -89,11 +89,11 @@ skill's job is only to note it, never to fork the page.
 - Tiles match the app's visual language; clicking a thing shows its Markdown
   content, sub-things, marks, and comments. Data refreshes on a ~30 s poll —
   the connector contract's floor, so "live" means within half a minute.
-- The radar toggle arms **follow mode**: any thing created or updated after
-  arming opens automatically (workspace switch and breadcrumbs included) — the
-  way to watch an agent build things in real time. When the agent keeps
-  writing into the thing already open, its text updates in place instead of
-  re-opening, landing in ~15 s on average. Manual navigation pauses follow; it
-  is off on every load.
+- **Follow mode is on from the moment the panel opens**: any thing created or
+  updated after that opens automatically (workspace switch and breadcrumbs
+  included) — the way to watch an agent build things in real time. When the
+  agent keeps writing into the thing already open, its text updates in place
+  instead of re-opening, landing in ~15 s on average. Manual navigation pauses
+  follow, and the radar toggle in the header turns it off and back on.
 - Read-only today: marks and comments display, but writing them stays in the
   app.
