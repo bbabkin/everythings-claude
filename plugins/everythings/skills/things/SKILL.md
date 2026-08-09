@@ -89,6 +89,11 @@ skill's job is only to note it, never to fork the page.
 - Tiles match the app's visual language; clicking a thing shows its Markdown
   content, sub-things, marks, and comments. Data refreshes on a ~30 s poll —
   the connector contract's floor, so "live" means within half a minute.
+- The workspace's **wallpaper** sits behind it all, per theme and arranged the
+  way the app arranges it. Artifact pages cannot load images from another
+  host, so the built-in wallpapers travel inside the page; a wallpaper the
+  user uploaded themselves shows as a tint in the workspace's accent colour
+  instead. Workspaces decorated in the app therefore look decorated here.
 - **Follow mode is on from the moment the panel opens**: any thing created or
   updated after that opens automatically (workspace switch and breadcrumbs
   included) — the way to watch an agent build things in real time. When the
