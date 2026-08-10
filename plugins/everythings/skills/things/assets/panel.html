@@ -22,7 +22,8 @@
     --tile-shadow-image: radial-gradient(rgba(0, 0, 0, 0.2) 0%, transparent 60%);
     --tile-hilite-hover: 0.5;
     --logo-shadow: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.18));
-    --bg-veil: hsl(0 0% 100% / 0.55);
+    --panel-veil: hsl(0 0% 100% / 0.3);
+    --panel-top: hsl(0 0% 89%);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -43,6 +44,8 @@
       --tile-shadow-image: radial-gradient(rgba(255, 255, 255, 0.3) 0%, transparent 40%);
       --tile-hilite-hover: 0;
       --logo-shadow: none;
+      --panel-veil: hsl(0 0% 0% / 0.3);
+      --panel-top: hsl(0 0% 100% / 0.3);
     }
   }
   :root[data-theme="dark"] {
@@ -63,7 +66,8 @@
     --tile-shadow-image: radial-gradient(rgba(255, 255, 255, 0.3) 0%, transparent 40%);
     --tile-hilite-hover: 0;
     --logo-shadow: none;
-    --bg-veil: hsl(0 0% 4% / 0.55);
+    --panel-veil: hsl(0 0% 0% / 0.3);
+    --panel-top: hsl(0 0% 100% / 0.3);
   }
   :root[data-theme="light"] {
     --bg: hsl(0 0% 100%);
@@ -83,7 +87,8 @@
     --tile-shadow-image: radial-gradient(rgba(0, 0, 0, 0.2) 0%, transparent 60%);
     --tile-hilite-hover: 0.5;
     --logo-shadow: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.18));
-    --bg-veil: hsl(0 0% 100% / 0.55);
+    --panel-veil: hsl(0 0% 100% / 0.3);
+    --panel-top: hsl(0 0% 89%);
   }
 
   html, body { margin: 0; padding: 0; }
@@ -107,42 +112,61 @@
      the light or dark image for the active theme, arranged cover | bottom |
      tiled, and the app's white→#ddd wash in light mode for a workspace with
      no wallpaper. It rides behind everything (fixed, negative z-index, above
-     the body canvas); the sticky header turns to glass over it so tiles pass
-     under it instead of into an opaque bar. */
+     the body canvas); the sticky header is transparent, so it shows through
+     the bar too. */
   #wallpaper { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
-  html.has-wallpaper header.bar {
-    margin: 0 -16px;
-    padding-left: 16px; padding-right: 16px;
-    background: var(--bg-veil);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-  }
 
   /* --------------------------------------------------- header: no bar.
-     Workspace picker left, logo badge center, refresh + status right. */
+     Workspace picker left, logo badge center, refresh + status right.
+     Transparent on the workspace grid, where the wallpaper should run edge to
+     edge. Over an open thing it takes the same veil as the pane below it, so
+     the card scrolling under it passes behind glass rather than into nothing;
+     full-bleed there, hence the negative margin against #app's padding. */
   header.bar {
     position: sticky; top: 0; z-index: 10;
     display: grid; grid-template-columns: 1fr auto 1fr;
     align-items: center; gap: 10px;
-    padding: 12px 0 10px;
-    background: var(--bg);
+    padding: 6px 0;
+    background: transparent;
+  }
+  html.thing-open header.bar {
+    margin: 0 -16px;
+    padding-left: 16px; padding-right: 16px;
+    background: var(--panel-veil);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
   }
   .bar .left { justify-self: start; min-width: 0; }
   .bar .right { justify-self: end; display: flex; align-items: center; gap: 8px; }
-  .logo { display: block; width: 38px; height: 38px; filter: var(--logo-shadow); }
+  .logo { display: block; width: 24px; height: 24px; filter: var(--logo-shadow); }
 
-  select#wsSelect {
-    max-width: 100%;
-    padding: 6px 4px;
-    border: none; border-radius: 8px;
-    background: transparent; color: var(--fg);
-    font-family: inherit; font-weight: 600; font-size: 15px;
-    cursor: pointer;
+  /* Workspace picker. A native select sizes itself to its widest option, which
+     stranded the chevron a workspace-name away from the name on show. So the
+     select is laid invisibly over a label that is only as wide as the current
+     name, and the chevron sits against it. The native dropdown still opens,
+     and focus lands on the real control. */
+  .wspick {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 2px;
+    max-width: 100%; padding: 3px 4px;
+    border-radius: 8px;
   }
-  select#wsSelect:hover { background: var(--card-hover); }
+  .wspick:hover { background: var(--card-hover); }
+  .wspick:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .wspick .name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--fg); font-weight: 600; font-size: 14px;
+  }
+  .wspick .chev { flex-shrink: 0; width: 14px; height: 14px; color: var(--muted); }
+  .wspick select {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; margin: 0; padding: 0;
+    border: none; opacity: 0; cursor: pointer;
+    font: inherit;
+  }
 
   button.iconbtn {
-    width: 32px; height: 32px;
+    width: 26px; height: 26px;
     display: grid; place-items: center;
     border: none; border-radius: 8px;
     background: transparent; cursor: pointer;
@@ -264,7 +288,30 @@
   .empty { color: var(--muted); font-style: italic; padding: 14px 2px; text-align: center; }
   .note { color: var(--muted); font-size: 12px; margin-top: 6px; text-align: center; }
 
-  /* ------------------------------------------------------------------ detail */
+  /* ------------------------------------------------------------------ detail.
+     An opened thing sits on its own pane: a white or black veil over a blurred
+     backdrop, so the workspace wallpaper reads as texture behind the text
+     instead of competing with it.
+     The veil is light (0.3) so the wallpaper reads through it. How much that
+     shows is the wallpaper's to decide, not this rule's: measured behind the
+     pane, the dark preset "abstract" spans 55 levels of luminance and comes
+     through plainly, while the light preset "fog" is flat white there (mean
+     252/255, spread 6), so no alpha reveals anything.
+     The 4px top edge is the app's, which caps a thing card the same way; the
+     app tints it with the thing's own colour, a field the read tools here do
+     not carry, so it takes the app's uncoloured fallback per theme. */
+  .thing-card {
+    margin-top: 6px;
+    padding: 14px 18px 20px;
+    border-top: 4px solid var(--panel-top);
+    border-radius: var(--radius);
+    background: var(--panel-veil);
+    box-shadow: 0 6px 24px hsl(0 0% 0% / 0.12);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
+  }
+  .thing-card > .thing-head { margin-top: 0; }
+
   .sect-label {
     margin: 22px 0 4px;
     font-size: 11px; font-weight: 600;
@@ -272,23 +319,63 @@
     color: var(--muted);
   }
   .sect-label .cnt { font-weight: 400; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
-  .crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
-  .crumbs button {
-    border: none; background: none; padding: 2px 4px; cursor: pointer;
-    color: var(--link); border-radius: 4px;
+  /* The pane's header is one inline line, the way the app's thing card reads:
+     each ancestor with its emoji in muted type, a chevron between, then this
+     thing in full weight with its own. The workspace is not part of it, the
+     header's picker names it already. */
+  .thing-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; }
+  .crumbs {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+    flex: 1; min-width: 0; margin: 0;
+    font-size: 14px; color: var(--muted);
   }
-  .crumbs button:hover { text-decoration: underline; }
+  /* Ancestors sit in the same flex line as the current thing, not a box of
+     their own, so the gap and wrapping stay uniform across the whole row. */
+  #crumbTrail { display: contents; }
+  .crumbs button {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: none; background: none; padding: 0; cursor: pointer;
+    color: var(--muted); font-size: 14px;
+  }
+  .crumbs button:hover { color: var(--fg); text-decoration: underline; }
+  .crumbs .ce { font-size: 17px; line-height: 1; }
   .crumbs .sep { user-select: none; }
-  .thing-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 8px 0 2px; }
-  .thing-head .e { font-size: 34px; line-height: 1; }
-  .thing-head h1 { font-size: 21px; font-weight: 600; margin: 0; text-wrap: balance; }
-  .thing-head .openapp { font-size: 12px; white-space: nowrap; color: var(--muted); }
-  .thing-head .openapp:hover { color: var(--fg); }
+  .crumb-current {
+    display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+    margin: 0; font-size: 15px; font-weight: 600; color: var(--fg);
+  }
+  .crumb-current .e { font-size: 21px; line-height: 1; }
+  /* Its own line under the header, left aligned: a secondary action that has
+     no business competing with the title for the top row. */
+  .openapp {
+    display: inline-block; margin: 3px 0 14px;
+    font-size: 11px; white-space: nowrap; color: var(--muted);
+  }
+  .openapp:hover { color: var(--fg); }
+  /* Close: the app's own control, a 27px filled circle-X (Heroicons solid)
+     that is muted until hover, pinned to the top right of the pane. A real
+     button here, since the app renders a bare click-handling SVG that keyboard
+     users cannot reach. */
+  .thing-head .closebtn {
+    margin-left: auto; align-self: center; flex-shrink: 0;
+    width: 27px; height: 27px; padding: 0;
+    border: none; border-radius: 50%;
+    background: none; color: var(--muted);
+    cursor: pointer; transition: color 0.2s;
+  }
+  .thing-head .closebtn:hover { color: var(--brand); }
+  .thing-head .closebtn svg { display: block; width: 27px; height: 27px; }
 
-  .marks-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  /* In the header line, pushed to the right by the crumbs' flex:1 and ending
+     just short of the close button. Wraps under the title when a long name and
+     a crowd of marks cannot share one line. */
+  .marks-row {
+    display: flex; flex-wrap: wrap; justify-content: flex-end;
+    gap: 6px; margin: 0; flex-shrink: 0;
+  }
   .mark-chip {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 10px;
+    padding: 3px 9px;
     border-radius: 999px;
     background: var(--card-hover); font-size: 13px;
   }
@@ -351,11 +438,16 @@
 <div id="app">
   <header class="bar">
     <div class="left">
-      <select id="wsSelect" aria-label="Workspace"><option>Loading…</option></select>
+      <span class="wspick">
+        <span class="name" id="wsName">Loading…</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        <select id="wsSelect" aria-label="Workspace"><option>Loading…</option></select>
+      </span>
     </div>
     <img class="logo" alt="Everythings" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAyNi4zLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeD0iMHB4IiB5PSIwcHgiDQoJIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCA1MTIgNTEyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7ZmlsbDp1cmwoI2JnR3JhZCk7fQ0KCS5zdDF7ZmlsbDojRkZGRkZGO30NCjwvc3R5bGU+DQo8bGluZWFyR3JhZGllbnQgaWQ9ImJnR3JhZCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiIHgxPSIyNTYiIHkxPSI2Mi4yIiB4Mj0iMjU2IiB5Mj0iNDQ5LjciPg0KCTxzdG9wICBvZmZzZXQ9IjAiIHN0eWxlPSJzdG9wLWNvbG9yOiNBODM2OTEiLz4NCgk8c3RvcCAgb2Zmc2V0PSIxIiBzdHlsZT0ic3RvcC1jb2xvcjojMkEzQjhFIi8+DQo8L2xpbmVhckdyYWRpZW50Pg0KPGc+DQoJPHBhdGggY2xhc3M9InN0MCIgZD0iTTM4Ny45LDYyLjJIMTI3LjdjLTU0LjEsMC05Ny45LDQzLjgtOTcuOSw5Ny45djE5MS43YzAsNTQuMSw0My44LDk3LjksOTcuOSw5Ny45aDI2MC4zDQoJCWM1NC4xLDAsOTcuOS00My44LDk3LjktOTcuOVYxNjAuMUM0ODUuOSwxMDYuMSw0NDIsNjIuMiwzODcuOSw2Mi4yeiIvPg0KPC9nPg0KPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjU2IDI0Ni4yMDcpIHNjYWxlKDAuODUpIHRyYW5zbGF0ZSgtMjU2IC0yNDYuMjA3KSI+DQo8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNDM4LjEsMzIxLjljLTEuMi02LjUtMy40LTEyLjctNi41LTE4LjNjLTcuNS0xMy43LTE5LjItMjQuMi0zNS0zMWMtMTAuMi00LjQtMjEuNi03LjEtMzQuMS03LjgNCgljLTIuNC0wLjEtNC43LTAuMi03LjEtMC4yYy00LjUsMC05LjEsMC4zLTEzLjYsMC44Yy03LjUsMC45LTE1LDIuNS0yMi4zLDQuOWMtOC43LDIuOS0xNy4yLDYuOC0yNi4xLDExLjljLTcuMSw0LjEtMTQuMyw5LTIyLDE0LjgNCgljLTQuNCwzLjMtOC43LDYuNy0xMy4xLDEwbC0yLjMsMS44TDIyNCwzMzQuOWMtNC4zLDMuNS04LjcsNy0xMy4yLDEwLjNjLTcsNS4xLTEzLDguOS0xOS4xLDEyYy02LjEsMy4xLTExLjksNS40LTE3LjcsNi44DQoJYy01LjEsMS4zLTEwLjMsMS45LTE1LjMsMS45Yy0wLjgsMC0xLjYsMC0yLjQsMGMtMTcuMi0wLjctMzAuOC05LTM1LjQtMjEuNmMtMS4zLTMuNi0xLjgtNy4yLTEuNi0xMC45YzAuOS0xMy44LDEzLjctMjUuOCwzMS4zLTI5DQoJYzMuMS0wLjYsNi4zLTAuOSw5LjYtMC45YzEuNSwwLDIuOSwwLjEsNC40LDAuMmM3LjIsMC41LDE0LjIsMi40LDIxLjQsNS42YzUuMywyLjQsMTAuNiw1LjQsMTYuNyw5LjVjMiwxLjQsMy45LDIuOCw1LjgsNC4yDQoJbDMwLjgtMjcuMWMtMS4zLTEtMi41LTItMy44LTNjLTcuOS01LjgtMTQuOC0xMC4yLTIxLjctMTRjLTguMS00LjQtMTUuOC03LjctMjMuNi0xMC4xYy04LjYtMi42LTE3LjMtNC4xLTI1LjktNC40DQoJYy0xLjMsMC0yLjYtMC4xLTMuOS0wLjFjLTcsMC0xMy45LDAuNi0yMC43LDEuOWMtMTUsMi44LTI4LjEsOC40LTM4LjksMTYuNGMtMTcuNCwxMy0yNi45LDI5LjUtMjguMSw0OWMtMC4zLDUuMiwwLjEsMTAuNSwxLjIsMTYuMg0KCWMxLjMsNi44LDMuNywxMy4xLDYuOSwxOC44YzguOCwxNS42LDIzLDI2LjcsNDIuMiwzMy4xYzguMSwyLjcsMTYuOSw0LjMsMjYuNCw0LjljMi40LDAuMSw0LjgsMC4yLDcuMSwwLjJjMy44LDAsNy43LTAuMiwxMS41LTAuNQ0KCWM2LjgtMC42LDEzLjUtMS45LDIwLjEtMy44YzkuMi0yLjYsMTguMS02LjMsMjcuMy0xMS40YzctMy45LDE0LjEtOC41LDIyLjMtMTQuNWM2LjEtNC41LDEyLjEtOS4yLDE4LTEzLjlsMC4yLTAuMmwzMi4xLTI2LjENCgljNC40LTMuNiw5LTcuMiwxMy42LTEwLjZjNi43LTQuOSwxMi42LTguNiwxOC41LTExLjZjNi0zLjEsMTEuNy01LjMsMTcuNS02LjhjNS4yLTEuMywxMC41LTIsMTUuNi0ybDAuOSwwDQoJYzguMywwLjEsMTUuNywxLjksMjEuOSw1LjJjNy4yLDMuOCwxMiw4LjksMTQuNywxNS41YzEuNyw0LjEsMi4zLDguMywxLjksMTIuNmMtMS4zLDEzLjUtMTQuMiwyNS4xLTMxLjQsMjguMg0KCWMtMy4xLDAuNi02LjMsMC44LTkuNSwwLjhjLTEuNywwLTMuNC0wLjEtNS4xLTAuMmMtNi41LTAuNi0xMi45LTIuMi0xOS41LTVjLTUuNC0yLjMtMTAuOC01LjMtMTYuOS05LjRjLTItMS4zLTMuOS0yLjctNS44LTQuMQ0KCWwtMzEuNiwyNi43YzAuNywwLjUsMS40LDEuMSwyLjEsMS42YzcuOCw1LjcsMTQuNiwxMC4yLDIxLjQsMTRjNy45LDQuNCwxNS40LDcuOCwyMy4xLDEwLjNjOCwyLjYsMTYuMyw0LjMsMjQuNCw0LjkNCgljMi41LDAuMiw1LDAuMyw3LjUsMC4zYzIuMywwLDQuNS0wLjEsNi44LTAuMmM2LjctMC40LDEyLjgtMS4yLDE4LjYtMi42YzIzLjMtNS42LDQxLTE3LjEsNTIuNS0zNC4yYzUuOS04LjgsOS4zLTE4LjYsMTAuMS0yOQ0KCUM0MzkuNiwzMzMuNCw0MzkuMiwzMjcuNiw0MzguMSwzMjEuOXoiLz4NCjxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik03My45LDE1Ny4yYzEuMi02LjUsMy40LTEyLjcsNi41LTE4LjMNCgljNy41LTEzLjcsMTkuMi0yNC4yLDM1LTMxYzEwLjItNC40LDIxLjYtNy4xLDM0LjEtNy44YzIuNC0wLjEsNC43LTAuMiw3LjEtMC4yYzQuNSwwLDkuMSwwLjMsMTMuNiwwLjhjNy41LDAuOSwxNSwyLjUsMjIuMyw0LjkNCgljOC43LDIuOSwxNy4yLDYuOCwyNi4xLDExLjljNi42LDMuOSwxMy40LDguNSwyMC42LDEzLjhsLTMwLjUsMjYuOGMtNi00LjMtMTEuNC03LjctMTYuOC0xMC40Yy02LTMuMS0xMS43LTUuMy0xNy41LTYuOA0KCWMtNS4yLTEuMy0xMC41LTItMTUuNi0ybC0wLjksMGMtOC4zLDAuMS0xNS43LDEuOS0yMS45LDUuMmMtNy4yLDMuOC0xMiw4LjktMTQuNywxNS41Yy0xLjcsNC4xLTIuMyw4LjMtMS45LDEyLjYNCgljMS4zLDEzLjUsMTQuMiwyNS4xLDMxLjQsMjguMmMzLjEsMC42LDYuMywwLjgsOS41LDAuOGMxLjcsMCwzLjQtMC4xLDUuMS0wLjJjNi41LTAuNiwxMi45LTIuMiwxOS41LTVjNS40LTIuMywxMC44LTUuMywxNi45LTkuNA0KCWM1LjEtMy40LDEwLTcuMiwxNS0xMS4xbDcuMS01LjVsMC4xLDAuMWwzMS45LTI2bDAuMSwwLjFsMS45LTEuNWM2LTQuNywxMi4yLTkuNiwxOC42LTE0LjNjNy45LTUuOCwxNC44LTEwLjIsMjEuNy0xNA0KCWM4LjEtNC40LDE1LjgtNy43LDIzLjYtMTAuMWM4LjYtMi42LDE3LjMtNC4xLDI1LjktNC40YzEuMywwLDIuNi0wLjEsMy45LTAuMWM3LDAsMTMuOSwwLjYsMjAuNywxLjljMTUsMi44LDI4LjEsOC40LDM4LjksMTYuNA0KCWMxNy40LDEzLDI2LjksMjkuNSwyOC4xLDQ5YzAuMyw1LjItMC4xLDEwLjUtMS4yLDE2LjJjLTEuMyw2LjgtMy43LDEzLjEtNi45LDE4LjhjLTguOCwxNS42LTIzLDI2LjctNDIuMiwzMy4xDQoJYy04LjEsMi43LTE2LjksNC4zLTI2LjQsNC45Yy0yLjQsMC4xLTQuOCwwLjItNy4xLDAuMmMtMy44LDAtNy43LTAuMi0xMS41LTAuNWMtNi44LTAuNi0xMy41LTEuOS0yMC4xLTMuOA0KCWMtOS4yLTIuNi0xOC4xLTYuMy0yNy4zLTExLjRjLTctMy45LTE0LjEtOC41LTIyLjMtMTQuNWMtMC41LTAuMy0wLjktMC43LTEuNC0xLjFsMzEuMy0yNi40YzUuNyw0LDEwLjksNy4zLDE2LjEsOS45DQoJYzYuMSwzLjEsMTEuOSw1LjQsMTcuNyw2LjhjNS4xLDEuMywxMC4zLDEuOSwxNS4zLDEuOWMwLjgsMCwxLjYsMCwyLjQsMGMxNy4yLTAuNywzMC44LTksMzUuNC0yMS42YzEuMy0zLjYsMS44LTcuMiwxLjYtMTAuOQ0KCWMtMC45LTEzLjgtMTMuNy0yNS44LTMxLjMtMjljLTMuMS0wLjYtNi4zLTAuOS05LjYtMC45Yy0xLjUsMC0yLjksMC4xLTQuNCwwLjJjLTcuMiwwLjUtMTQuMiwyLjQtMjEuNCw1LjYNCgljLTUuMywyLjQtMTAuNiw1LjQtMTYuNyw5LjVjLTQuOSwzLjMtOS40LDYuOC0xNC44LDExbC02LjUsNWwtMzEuOCwyNkwyNTYsMTk2Yy02LjEsNC45LTEyLjQsOS45LTE4LjksMTQuNw0KCWMtNy44LDUuNy0xNC42LDEwLjItMjEuNCwxNGMtNy45LDQuNC0xNS40LDcuOC0yMy4xLDEwLjNjLTgsMi42LTE2LjMsNC4zLTI0LjQsNC45Yy0yLjUsMC4yLTUsMC4zLTcuNSwwLjNjLTIuMywwLTQuNS0wLjEtNi44LTAuMg0KCWMtNi43LTAuNC0xMi44LTEuMi0xOC42LTIuNmMtMjMuMy01LjYtNDEtMTcuMS01Mi41LTM0LjJjLTUuOS04LjgtOS4zLTE4LjYtMTAuMS0yOUM3Mi40LDE2OC43LDcyLjgsMTYzLDczLjksMTU3LjJ6Ii8+DQo8L2c+DQo8L3N2Zz4NCg==">
     <div class="right">
-      <button class="iconbtn" id="followBtn" title="Follow activity: open things as they are created or updated" aria-label="Follow activity" aria-pressed="false">
+      <button class="iconbtn" id="followBtn" title="Follow activity: open things as they are created or updated. Switches off after 5 quiet minutes." aria-label="Follow activity" aria-pressed="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
           <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
           <path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M8.5 15.5a5 5 0 0 1 0-7" />
@@ -382,25 +474,43 @@
   'use strict';
   const SERVER = 'Everythings';
   const APP_URL = 'https://everythings.app';
-  const POLL = 30000;
-  // Declared polling for the live surfaces (followed thing, activity feed).
-  // The runtime clamps refetchInterval to a ~30 s floor today, so this asks
-  // for the fastest cadence allowed and picks up anything faster for free if
-  // the floor ever drops. Sub-floor freshness comes from invalidateThing()
-  // below — change-triggered, never a timer.
+  // Polling is this page's entire running cost, and it is paid by the app's
+  // own hosting: every tick of every watch is a request, from every panel
+  // anyone has left open, whether or not a human is looking. So NOTHING polls
+  // unless follow mode is armed. With follow off the panel is a snapshot that
+  // refreshes when the viewer navigates (registering a watch executes it) and
+  // when they press refresh (invalidate makes registered watches re-execute)
+  // — everything a reader needs, at no standing cost. Never give a watch a
+  // refetchInterval outside the follow path.
+  //
+  // Declared cadence for the live surfaces while following. The runtime
+  // clamps refetchInterval to a ~30 s floor today, so this asks for the
+  // fastest cadence allowed and picks up anything faster for free if the
+  // floor ever drops. Sub-floor freshness comes from invalidateThing() below
+  // — change-triggered, never a timer.
   const POLL_FAST = 15000;
+  // Following is not a mode anyone remembers to switch off, so it switches
+  // itself off after this long with nothing written. That is what stops a
+  // panel left open overnight from polling until morning. Only a real change
+  // restarts the clock: a poll that reports nothing new IS the inactivity
+  // being measured.
+  const FOLLOW_IDLE = 300000;
   // Long-lived cache: watchTool replays the stored entry instantly on
   // (re)registration and still refreshes once it is past staleTime, so a
   // day-long gcTime makes reopening the panel paint from last-good data at
-  // once instead of a skeleton. staleTime above POLL keeps grid<->thing
-  // navigation from re-executing reads the 30 s poll just refreshed.
+  // once instead of a skeleton. A staleTime above the poll cadence keeps
+  // grid<->thing navigation, and the re-registration a follow flip causes,
+  // from re-executing reads that were just refreshed.
   const CACHE = { staleTime: 60000, gcTime: 86400000 };
-  // Thing-detail reads: replay the stored entry instantly (same day-long
-  // gcTime) but never serve it without refreshing. staleTime 0 matters while
-  // following — a thing whose text an agent is still filling in must not be
-  // answered from a copy taken seconds ago.
+  // Thing-detail reads while following: replay the stored entry instantly
+  // (same day-long gcTime) but never serve it without refreshing. staleTime 0
+  // matters only then — a thing whose text an agent is filling in must not be
+  // answered from a copy taken seconds ago. Idle, the live surfaces fall back
+  // to CACHE, so re-registering one replays instead of spending a flight.
   const LIVE_CACHE = { staleTime: 0, gcTime: 86400000 };
-  const LIVE_OPTS = { cache: LIVE_CACHE, refetchInterval: POLL_FAST };
+  // Marks a surface an agent can change under the viewer: it polls while
+  // follow is armed, and only then. See watch().
+  const LIVE_OPTS = { live: true };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -447,6 +557,7 @@
     view: null,            // {type:'grid'} | {type:'thing', id, name, emoji, trail:[{id,name,emoji}]}
     autoWs: true,          // false once the user picks a workspace themselves
     noBoot: false,         // true once the server proves it lacks the bootstrap tool
+    noThingView: false,    // ditto for get_thing_view (detail view falls back to four calls)
     follow: false,         // follow mode: auto-open things as activity happens (boot arms it)
     followSeen: null,      // newest server updatedAt handled (null until baselined)
     gridPrev: null,        // map id -> {name, emoji} of last grid delivery
@@ -562,9 +673,6 @@
       // The app's own no-wallpaper light background.
       s.backgroundImage = 'linear-gradient(to bottom, #ffffff, #dddddd)';
     }
-    // The sticky header turns to glass only over a real image or an accent
-    // tint; over the plain light wash an opaque bar is already invisible.
-    document.documentElement.classList.toggle('has-wallpaper', !!(image || (url && accent && HEX.test(accent))));
   }
 
   function setChrome(chrome) {
@@ -680,20 +788,66 @@
   }
 
   // ---------------------------------------------------------------- watches
+  // A live watch (opts.live) reads a surface an agent can change under the
+  // viewer — the open thing, the landing grid. Those are the only watches
+  // that ever poll, and only while follow mode is armed; the mode flipping
+  // re-registers them on the new cadence rather than tearing down the view,
+  // since what changes is how often they refresh, not what is on screen.
+  // Every other watch fetches once at registration and afterwards only when
+  // something invalidates it.
+  //
   // onErr (optional) sees the error first; returning true swallows it so a
   // caller can branch (e.g. fall back when a tool is missing) without the
   // page-level error handling kicking in.
+  const liveWatches = new Set();
   function watch(tool, input, onData, section, opts, onErr) {
-    const un = mcp.watchTool(SERVER, tool, input, (ev) => {
+    const o = opts || {};
+    const handler = (ev) => {
       if (ev.type === 'data') { markData(ev.result); onData(ev.result.payload, ev.result); }
       else if (!(onErr && onErr(ev.error))) handleErr(section, ev.error);
-    }, Object.assign({ cache: CACHE, refetchInterval: POLL }, opts || {}));
-    return un;
+    };
+    let un = null;
+    const bind = () => {
+      const options = {};
+      if (o.live) {
+        options.cache = state.follow ? LIVE_CACHE : CACHE;
+        if (state.follow) options.refetchInterval = POLL_FAST;
+      } else {
+        options.cache = o.cache || CACHE;
+        // Only the follow feed passes one, and only while it exists.
+        if (o.refetchInterval) options.refetchInterval = o.refetchInterval;
+      }
+      un = mcp.watchTool(SERVER, tool, input, handler, options);
+    };
+    bind();
+    const stop = () => {
+      liveWatches.delete(stop);
+      if (!un) return;
+      const u = un;
+      un = null; // unsubscribing twice is fine; re-binding a stopped watch is not
+      try { u(); } catch { /* idempotent */ }
+    };
+    if (o.live) {
+      stop.rebind = () => {
+        if (!un) return;
+        try { un(); } catch { /* idempotent */ }
+        bind();
+      };
+      liveWatches.add(stop);
+    }
+    return stop;
   }
   function clearScoped() {
     for (const un of subs.scoped) { try { un(); } catch { /* idempotent */ } }
     subs.scoped = [];
     for (const k of ['grid', 'children', 'thing', 'marks', 'comments']) renderKeys.delete(k);
+  }
+
+  // Only an open thing dresses the header (see header.bar): the grid leaves it
+  // fully transparent. Every assignment to state.view calls this.
+  function syncViewChrome() {
+    const open = !!(state.view && state.view.type === 'thing');
+    document.documentElement.classList.toggle('thing-open', open);
   }
 
   // ---------------------------------------------------------------- tiles
@@ -755,6 +909,7 @@
     clearScoped();
     const view = { type: 'grid' };
     state.view = view;
+    syncViewChrome();
     state.gridPrev = null;
     $('view').innerHTML =
       '<div id="gridSlot">' + skeletonGrid(8) + '</div><div data-err="grid"></div>' +
@@ -769,7 +924,7 @@
       subs.scoped.push(watch('list_things', { workspaceId: state.currentWs, limit: 200 }, (p) => {
         if (state.view !== view) return;
         renderGridThings(p);
-      }, 'grid'));
+      }, 'grid', LIVE_OPTS));
       return;
     }
 
@@ -794,7 +949,7 @@
       handleWorkspaces(p);
       if (state.view !== view) return; // handleWorkspaces re-landed under us
       if (p && p.landing) renderGridThings(p.landing);
-    }, 'grid', null, (err) => {
+    }, 'grid', LIVE_OPTS, (err) => {
       // A server predating the tool, or a policy/consent layer blocking just
       // this one (a freshly added manifest tool can lag the viewer's grant):
       // fall back to the two-call path once. If policy blocks the connector
@@ -812,9 +967,11 @@
   }
 
   // ---------------------------------------------------------------- detail view
-  function crumbBtn(label, onClick) {
+  // An ancestor crumb carries its emoji the way the app's parent link does.
+  function crumbBtn(item, onClick) {
     const b = document.createElement('button');
-    b.textContent = label;
+    b.innerHTML = (item.emoji ? '<span class="ce">' + emojiHtml(item.emoji) + '</span>' : '') +
+      '<span>' + esc(item.name) + '</span>';
     b.addEventListener('click', () => { userNav(); onClick(); });
     return b;
   }
@@ -822,51 +979,72 @@
   function openThing(t, trail) {
     clearScoped();
     state.view = { type: 'thing', id: t.id, name: t.name, emoji: t.emoji, trail };
+    syncViewChrome();
     state.childPrev = null;
-    const ws = state.workspaces.find((w) => w.id === state.currentWs);
     const v = $('view');
     v.innerHTML =
-      '<div class="crumbs" id="crumbs"></div>' +
-      '<div class="thing-head"><span class="e" id="dEmoji"></span><h1 id="dName"></h1>' +
-      '<a class="openapp" id="dOpen" target="_blank" rel="noopener">open in app ↗</a></div>' +
-      '<div class="marks-row" id="dMarks"></div><div data-err="marks"></div>' +
+      '<div class="thing-card">' +
+      '<div class="thing-head">' +
+      '<div class="crumbs" id="crumbs"><span id="crumbTrail"></span>' +
+      '<h1 class="crumb-current"><span class="e" id="dEmoji"></span><span id="dName"></span></h1></div>' +
+      '<div class="marks-row" id="dMarks"></div>' +
+      '<button class="closebtn" id="dClose" aria-label="Close" title="Close">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" ' +
+      'd="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Z' +
+      'm-1.72 6.97a.75.75 0 1 0-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L12 13.06l1.72 1.72a.75.75 0 1 0 ' +
+      '1.06-1.06L13.06 12l1.72-1.72a.75.75 0 1 0-1.06-1.06L12 10.94l-1.72-1.72Z" clip-rule="evenodd"/></svg></button></div>' +
+      '<div><a class="openapp" id="dOpen" target="_blank" rel="noopener">open in app ↗</a></div>' +
+      '<div data-err="marks"></div>' +
       '<div class="prose" id="dContent"></div><div data-err="thing"></div>' +
-      '<div class="sect-label">Inside <span class="cnt" id="dChildCount"></span></div>' +
       '<div id="dChildren">' + skeletonGrid(4) + '</div><div data-err="children"></div>' +
       '<div id="dCommentsSect" hidden><div class="sect-label">Comments <span class="cnt" id="dCommentCount"></span></div>' +
-      '<div id="dComments"></div><div data-err="comments"></div></div>';
+      '<div id="dComments"></div><div data-err="comments"></div></div>' +
+      '</div>';
 
-    const crumbs = $('crumbs');
-    crumbs.appendChild(crumbBtn(ws ? ws.name : 'Workspace', openGrid));
+    // Every ancestor is followed by a chevron, because this thing always
+    // closes the line. A top-level thing has none and the line is just itself.
+    const trailEl = $('crumbTrail');
     for (const a of trail) {
-      crumbs.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
-      crumbs.appendChild(crumbBtn(a.name, () => openThing(a, trail.slice(0, trail.indexOf(a)))));
+      trailEl.appendChild(crumbBtn(a, () => openThing(a, trail.slice(0, trail.indexOf(a)))));
+      trailEl.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
     }
-    crumbs.insertAdjacentHTML('beforeend', '<span class="sep">›</span><span>' + esc(t.name) + '</span>');
 
     $('dEmoji').innerHTML = emojiHtml(t.emoji || '');
     $('dName').textContent = t.name;
     $('dOpen').href = APP_URL + '/workspaces/' + state.currentWs + '/things/' + t.id;
 
-    subs.scoped.push(watch('get_thing', { thingId: t.id }, (p) => {
+    // Closing goes up one level, matching the app: to the parent thing when
+    // this one is nested, to the workspace grid when it is top level.
+    $('dClose').addEventListener('click', () => {
+      userNav();
+      const up = trail[trail.length - 1];
+      if (up) openThing(up, trail.slice(0, -1));
+      else openGrid();
+    });
+
+    // Section renderers, shared by the one-call path and the legacy per-tool
+    // watches below. Each takes exactly the payload its own tool returns, so
+    // get_thing_view hands each one its matching section untouched.
+    const renderThing = (p) => {
       if (!state.view || state.view.id !== t.id) return;
       if (!changed('thing', p)) return;
       $('dEmoji').innerHTML = emojiHtml(p.emoji || '');
       $('dName').textContent = p.name || t.name;
       state.view.name = p.name || t.name;
       $('dContent').innerHTML = p.content ? mdRender(p.content) : '';
-    }, 'thing', LIVE_OPTS));
+    };
 
-    subs.scoped.push(watch('list_child_things', { parentId: t.id, limit: 200 }, (p) => {
+    const renderChildren = (p) => {
       if (!state.view || state.view.id !== t.id) return;
       const kids = (p && p.things) || [];
       if (!changed('children', kids)) return;
       const { flags, removed } = diffFlash(state.childPrev, kids);
       state.childPrev = new Map(kids.map((k) => [k.id, { name: k.name, emoji: k.emoji }]));
       for (const name of removed) toast('Removed: ' + name);
-      $('dChildCount').textContent = p.count ? '— ' + p.count : '';
       const slot = $('dChildren');
-      if (!kids.length) { slot.innerHTML = '<div class="empty">No sub-things.</div>'; return; }
+      // The tiles speak for themselves: no heading, and nothing at all when a
+      // thing has no sub-things (the Comments section hides the same way).
+      if (!kids.length) { slot.innerHTML = ''; return; }
       const grid = document.createElement('div');
       grid.className = 'grid';
       const nextTrail = trail.concat([{ id: t.id, name: state.view.name, emoji: t.emoji }]);
@@ -877,9 +1055,9 @@
       }
       slot.innerHTML = '';
       slot.appendChild(grid);
-    }, 'children', LIVE_OPTS));
+    };
 
-    subs.scoped.push(watch('list_marks', { thingId: t.id }, (p) => {
+    const renderMarks = (p) => {
       if (!state.view || state.view.id !== t.id) return;
       const marks = (p && p.marks) || [];
       if (!changed('marks', marks)) return;
@@ -892,9 +1070,9 @@
         chip.title = (m.users || []).join(', ');
         row.appendChild(chip);
       }
-    }, 'marks', LIVE_OPTS));
+    };
 
-    subs.scoped.push(watch('list_comments', { thingId: t.id, limit: 200 }, (p) => {
+    const renderComments = (p) => {
       if (!state.view || state.view.id !== t.id) return;
       const all = (p && p.comments) || [];
       if (!changed('comments', all)) return;
@@ -920,14 +1098,59 @@
         for (const r of byParent.get(c.id) || []) renderComment(r, true);
       };
       for (const c of roots) renderComment(c, false);
-    }, 'comments', LIVE_OPTS));
+    };
+
+    // One call for the whole thing page. The four sections used to be four
+    // watches, so an open thing cost four reads every poll — by far this
+    // page's largest running cost, and it fell on the app's own hosting. The
+    // server answers all four in one round trip, the way bootstrap already
+    // answers the landing view.
+    if (!state.noThingView) {
+      subs.scoped.push(watch('get_thing_view', { thingId: t.id, childLimit: 200, commentLimit: 200 }, (p) => {
+        if (!state.view || state.view.id !== t.id || !p) return;
+        // Thing first: it settles the name that the sub-thing breadcrumbs
+        // build their trail from.
+        renderThing(p.thing || {});
+        renderChildren(p.children);
+        renderMarks(p.marks);
+        renderComments(p.comments);
+      }, 'thing', LIVE_OPTS, (err) => {
+        // A server predating the tool, or a grant that has not caught up with
+        // a freshly added manifest entry: drop to the four-call path for the
+        // rest of the session. A connector blocked outright fails the same way
+        // on those calls and the page-level banner takes over from them.
+        if (!state.noThingView && (err.code === 'tool_error' || err.code === 'not_in_manifest' ||
+            err.code === 'blocked_by_policy' || err.code === 'approval_required' ||
+            err.code === 'bad_request' || err.code === 'transform_error')) {
+          state.noThingView = true;
+          if (state.view && state.view.id === t.id) openThing(t, trail);
+          return true;
+        }
+        return false;
+      }));
+      return;
+    }
+
+    subs.scoped.push(watch('get_thing', { thingId: t.id }, renderThing, 'thing', LIVE_OPTS));
+    subs.scoped.push(
+      watch('list_child_things', { parentId: t.id, limit: 200 }, renderChildren, 'children', LIVE_OPTS));
+    subs.scoped.push(watch('list_marks', { thingId: t.id }, renderMarks, 'marks', LIVE_OPTS));
+    subs.scoped.push(
+      watch('list_comments', { thingId: t.id, limit: 200 }, renderComments, 'comments', LIVE_OPTS));
   }
 
   // ---------------------------------------------------------------- markdown (GFM subset)
   function mdInline(src) {
+    // Code spans are lifted out before the other inline rules run, so their
+    // text is never re-parsed as markup. The stand-in has to be something
+    // ordinary prose cannot produce: esc() has already turned every raw '<'
+    // into an entity, so an HTML comment here can only be one of ours, and
+    // it stays inert if one is ever left behind. A bare " 12 " is not safe.
+    // It matches any plain number in the text, so a line reading "500 gr"
+    // restored code span #500 and rendered the word undefined.
     let s = esc(src);
     const codes = [];
-    s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return ' ' + (codes.length - 1) + ' '; });
+    s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return '<!--c' + (codes.length - 1) + '-->'; });
     s = s.replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, (_, alt, url) =>
       '<a class="imgchip" href="' + url + '" target="_blank" rel="noopener">\u{1F5BC}️ ' + (alt || 'image') + '</a>');
     s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
@@ -936,7 +1159,10 @@
     s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<i>$2</i>');
     s = s.replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, '$1<i>$2</i>');
     s = s.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-    s = s.replace(/ (\d+) /g, (_, i) => '<code>' + codes[Number(i)] + '</code>');
+    s = s.replace(/<!--c(\d+)-->/g, (_, i) => {
+      const c = codes[Number(i)];
+      return c === undefined ? '' : '<code>' + c + '</code>';
+    });
     return s;
   }
 
@@ -1032,10 +1258,19 @@
   }
 
   // ---------------------------------------------------------------- workspaces
+  // The visible label is a separate element from the select behind it, so it
+  // has to be told whenever the selection moves.
+  function syncWsLabel() {
+    const sel = $('wsSelect');
+    const opt = sel.options[sel.selectedIndex];
+    $('wsName').textContent = opt ? opt.textContent : '';
+  }
+
   function selectWorkspace(id, open) {
     state.currentWs = id;
     store.set('ews.ws', id);
     $('wsSelect').value = id;
+    syncWsLabel();
     if (open !== false) openGrid();
   }
 
@@ -1049,6 +1284,7 @@
       sel.appendChild(o);
     }
     if (state.currentWs) sel.value = state.currentWs;
+    syncWsLabel();
   }
 
   // Digests a {workspaces, defaultWorkspaceId}-shaped payload — delivered by
@@ -1059,6 +1295,7 @@
     if (!state.workspaces.length) {
       clearScoped();
       state.view = null;
+      syncViewChrome();
       $('view').innerHTML = '<div class="empty">No workspaces yet — create one in the app.</div>';
       return;
     }
@@ -1096,10 +1333,32 @@
   // lands within half a minute of the write and a burst lands on the newest.
   // The first delivery after arming only sets the baseline — server
   // timestamps compare against server timestamps, never the local clock.
+  //
+  // It is also the panel's whole polling budget. Armed, this feed and the
+  // live surfaces poll; off, nothing does, and the page updates only when the
+  // viewer navigates or presses refresh. So the mode ends three ways: a
+  // manual tile/crumb/workspace click pauses it (the viewer is steering, not
+  // watching), the toggle stops it, and FOLLOW_IDLE minutes without a write
+  // switch it off on their behalf.
   function userNav() {
     if (!state.follow) return;
     setFollow(false);
     toast('Follow paused');
+  }
+
+  // Nothing written for FOLLOW_IDLE, so stop: an armed panel nobody is
+  // feeding re-reads the activity feed at the app's expense until its tab
+  // closes, which is most of what an idle panel ever cost. The toggle says
+  // why it stopped and turns it back on.
+  let followIdle = null;
+  function bumpIdle() {
+    if (followIdle) clearTimeout(followIdle);
+    followIdle = setTimeout(() => {
+      followIdle = null;
+      if (!state.follow) return;
+      setFollow(false);
+      toast('Follow off — nothing new for 5 minutes');
+    }, FOLLOW_IDLE);
   }
 
   function setFollow(on) {
@@ -1111,7 +1370,12 @@
     for (const un of subs.follow) { try { un(); } catch { /* idempotent */ } }
     subs.follow = [];
     renderKeys.delete('follow');
+    // The mode is what decides whether anything polls at all, so every live
+    // surface currently on screen is re-registered on the new cadence.
+    for (const w of Array.from(liveWatches)) { try { w.rebind(); } catch { /* gone */ } }
+    if (followIdle) { clearTimeout(followIdle); followIdle = null; }
     if (!on) return;
+    bumpIdle();
     // Uncached (gcTime 0): a replay from an earlier arming would make the
     // baseline stale and the first "jump" an old edit.
     subs.follow.push(watch('recent_things', { limit: 3 }, (p) => {
@@ -1124,6 +1388,9 @@
       const next = items.find((x) => x.ts > state.followSeen);
       if (!next) return;
       state.followSeen = next.ts;
+      // A write landed, so there is something to follow: the idle clock
+      // starts over from here, not from arming.
+      bumpIdle();
       const open = state.view && state.view.type === 'thing' ? state.view.id : null;
       // An agent still filling in the open thing: refresh it in place rather
       // than re-opening it. This feed and the thing's own watch poll on
@@ -1139,7 +1406,7 @@
   // and deliver now. Only registered watches re-execute, so this costs one
   // flight per visible section and only when the feed reported a real change.
   function invalidateThing() {
-    for (const tool of ['get_thing', 'list_child_things', 'list_comments', 'list_marks']) {
+    for (const tool of ['get_thing_view', 'get_thing', 'list_child_things', 'list_comments', 'list_marks']) {
       try { Promise.resolve(mcp.invalidate(SERVER, tool)).catch(() => {}); } catch { /* old shell */ }
     }
   }
@@ -1150,6 +1417,7 @@
       state.currentWs = t.workspaceId;
       store.set('ews.ws', t.workspaceId);
       $('wsSelect').value = t.workspaceId;
+      syncWsLabel();
     }
     const trail = await ancestorTrail(t.parentId);
     if (!state.follow) return; // switched off while we walked
@@ -1208,10 +1476,21 @@
       setFollow(!state.follow);
       toast(state.follow
         ? 'Following activity — things open here as they are created or updated'
-        : 'Follow off');
+        : 'Follow off — the panel holds still until you refresh');
     });
 
     setStatus('boot', 'connecting…');
+
+    // Armed on every load, and armed BEFORE the first view is built so the
+    // watches that view registers are born on the following cadence rather
+    // than being re-registered (and re-executed) a moment later. Watching an
+    // agent write is what the panel is for, and by the time someone opens it
+    // the agent is usually already working — an off-by-default toggle just
+    // costs them the first few things. Arming only baselines against the
+    // newest server timestamp, so nothing jumps until something is written
+    // after this moment; a manual tile/crumb/workspace click still pauses it,
+    // five quiet minutes switch it off, and the toggle stops it for good.
+    setFollow(true);
 
     // Speculative first paint: open the grid immediately — its bootstrap
     // watch answers the whole landing view (dropdown + tiles) in one round
@@ -1220,18 +1499,12 @@
     state.currentWs = store.get('ews.ws') || null;
     openGrid();
 
-    // Keeps the dropdown fresh (and the landing logic armed) while the viewer
-    // sits in thing views, where no bootstrap watch is registered; also the
-    // whole landing path when the server lacks the bootstrap tool.
-    subs.base.push(watch('list_workspaces', null, handleWorkspaces, 'workspaces', { refetchInterval: 120000 }));
-
-    // Armed on every load. Watching an agent write is what the panel is for,
-    // and by the time someone opens it the agent is usually already working —
-    // an off-by-default toggle just costs them the first few things. Arming
-    // only baselines against the newest server timestamp, so nothing jumps
-    // until something is written after this moment; a manual tile/crumb/
-    // workspace click still pauses it, and the toggle stops it for good.
-    setFollow(true);
+    // Fills the dropdown (and arms the landing logic) in thing views, where
+    // no bootstrap watch is registered; also the whole landing path when the
+    // server lacks the bootstrap tool. It does not poll: a viewer's set of
+    // workspaces changes on the scale of weeks, and the refresh button
+    // re-executes this along with everything else registered.
+    subs.base.push(watch('list_workspaces', null, handleWorkspaces, 'workspaces'));
   }
 
   boot();

@@ -87,8 +87,10 @@ skill's job is only to note it, never to fork the page.
   server's `bootstrap` tool (falls back to per-list calls on older servers or
   when a grant lags; degraded states are built in).
 - Tiles match the app's visual language; clicking a thing shows its Markdown
-  content, sub-things, marks, and comments. Data refreshes on a ~30 s poll —
-  the connector contract's floor, so "live" means within half a minute.
+  content, sub-things, marks, and comments. While follow mode is on, data
+  refreshes on a ~30 s poll — the connector contract's floor, so "live" means
+  within half a minute. With follow off the page holds still and refreshes
+  when the user navigates or presses the refresh button.
 - The workspace's **wallpaper** sits behind it all, per theme and arranged the
   way the app arranges it. Artifact pages cannot load images from another
   host, so the built-in wallpapers travel inside the page; a wallpaper the
@@ -99,6 +101,9 @@ skill's job is only to note it, never to fork the page.
   included) — the way to watch an agent build things in real time. When the
   agent keeps writing into the thing already open, its text updates in place
   instead of re-opening, landing in ~15 s on average. Manual navigation pauses
-  follow, and the radar toggle in the header turns it off and back on.
+  follow, the radar toggle in the header turns it off and back on, and five
+  minutes with nothing written switches it off on its own. That last part is
+  deliberate: following is the only thing that polls, so a panel left open
+  beside an idle agent settles down instead of reading all night.
 - Read-only today: marks and comments display, but writing them stays in the
   app.
