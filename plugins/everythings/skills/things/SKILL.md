@@ -101,7 +101,7 @@ skill's job is only to note it, never to fork the page.
   included) — the way to watch an agent build things in real time. When the
   agent keeps writing into the thing already open, its text updates in place
   instead of re-opening, landing in ~15 s on average. Manual navigation pauses
-  follow, the radar toggle in the header turns it off and back on, and five
+  follow, the radar toggle in the header turns it off and back on, and fifteen
   minutes with nothing written switches it off on its own. That last part is
   deliberate: following is the only thing that polls, so a panel left open
   beside an idle agent settles down instead of reading all night.
