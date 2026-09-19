@@ -32,8 +32,9 @@ copy; a connector-declaring artifact cannot be shared by URL.
 
    ```json
    {"mcp": {"servers": [{"server": "Everythings", "tools": [
-     "bootstrap", "list_workspaces", "list_things", "list_child_things",
-     "get_thing", "list_comments", "list_marks", "recent_things"]}]}}
+     "get_workspace_view", "get_thing_view", "list_workspaces", "list_things",
+     "list_child_things", "get_thing", "list_comments", "list_marks",
+     "recent_things"]}]}}
    ```
 
 5. Give the user the artifact link. That is the whole job.
@@ -84,18 +85,20 @@ skill's job is only to note it, never to fork the page.
 ## What the panel does (for answering questions)
 
 - Opens on the user's default workspace, painting in one round trip via the
-  server's `bootstrap` tool (falls back to per-list calls on older servers or
-  when a grant lags; degraded states are built in).
-- Tiles match the app's visual language; clicking a thing shows its Markdown
-  content, sub-things, marks, and comments. While follow mode is on, data
-  refreshes on a ~30 s poll — the connector contract's floor, so "live" means
-  within half a minute. With follow off the page holds still and refreshes
-  when the user navigates or presses the refresh button.
-- The workspace's **wallpaper** sits behind it all, per theme and arranged the
-  way the app arranges it. Artifact pages cannot load images from another
-  host, so the built-in wallpapers travel inside the page; a wallpaper the
-  user uploaded themselves shows as a tint in the workspace's accent colour
-  instead. Workspaces decorated in the app therefore look decorated here.
+  server's `get_workspace_view` tool; an open thing rides `get_thing_view` the
+  same way (both fall back to per-list calls on older servers or when a grant
+  lags; degraded states are built in).
+- Tiles match the app's visual language, on a plain surface rather than the
+  workspace's own background: the panel sits beside a conversation, where a
+  photographic backdrop competes with the text next to it. Clicking a thing
+  opens its card — Markdown content, sub-things, marks and comments, with the
+  marks in the top right and a grid icon back to the workspace. Sections with
+  nothing in them are absent rather than empty, and the 'view' visit counter
+  is not shown as a mark.
+- While follow mode is on, data refreshes on a ~30 s poll — the connector
+  contract's floor, so "live" means within half a minute. With follow off the
+  page holds still and refreshes when the user navigates or presses the
+  refresh button.
 - **Follow mode is on from the moment the panel opens**: any thing created or
   updated after that opens automatically (workspace switch and breadcrumbs
   included) — the way to watch an agent build things in real time. When the
