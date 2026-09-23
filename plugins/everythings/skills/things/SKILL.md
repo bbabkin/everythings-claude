@@ -95,6 +95,15 @@ skill's job is only to note it, never to fork the page.
   marks in the top right and a grid icon back to the workspace. Sections with
   nothing in them are absent rather than empty, and the 'view' visit counter
   is not shown as a mark.
+- Agents are visible. A thing an agent wrote says "✦ by Claude Code" (or
+  whichever agent) beside its name, a comment an agent posted reads "via" it,
+  and a question an agent asked the user shows on the thing with its options
+  and, once answered, the answer. **The panel never answers a question**: it
+  calls tools with the same connection the agent uses, so an answer from it
+  could not be told apart from the agent answering itself. The user answers in
+  the Everythings app (the question links there), on their phone, or by
+  telling the agent in a chat. Over the grid, one line counts what is waiting
+  in the workspace's inbox, when anything is.
 - While follow mode is on, data refreshes on a ~30 s poll — the connector
   contract's floor, so "live" means within half a minute. With follow off the
   page holds still and refreshes when the user navigates or presses the

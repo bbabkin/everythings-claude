@@ -390,6 +390,46 @@
   .mark-chip .c { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .mark-chip.mine { background: var(--brand-soft); }
 
+  /* "✦ by Claude Code" — who wrote this, when it was not the person reading.
+     After the name on the header line, quiet enough not to compete with it.
+     Same chip as the in-chat view and the app's badge. */
+  .agent-chip {
+    display: inline-flex; align-items: center;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--card-hover); color: var(--muted);
+    font-size: 11px; font-weight: 500; white-space: nowrap;
+  }
+
+  /* An agent's question, shown and never answered here: the panel calls tools
+     with the same token the agent holds, so an answer from this page could not
+     be told apart from the agent answering itself. The one link goes to the
+     thing in the app, where the answer is the person's own. Sits on --bg
+     because the card around it is already --card. */
+  .request { margin: 14px 0; padding: 12px 14px; border-radius: var(--radius);
+             border: 1px solid var(--brand); background: var(--bg); max-width: 68ch; }
+  .request.closed { border-color: var(--border); background: var(--card-hover); }
+  .request .asker { font-size: 11px; color: var(--muted); }
+  .request .q { font-size: 14px; font-weight: 600; margin: 3px 0 0; }
+  .request .opts { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .request .opts li { padding: 5px 9px; border-radius: 7px; background: var(--card-hover); font-size: 13px; }
+  .request .opts li .d { display: block; color: var(--muted); font-size: 11px; }
+  .request .said { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+  .request .said b { color: var(--fg); font-weight: 600; }
+  .request .said a { color: var(--link); }
+  .request .reply { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* What agents left for the viewer in this workspace, as counts from
+     get_workspace_view. One line over the grid, only while there is something
+     to say; the list itself lives in the app. */
+  .inbox-line {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center;
+    gap: 4px 10px; margin: 2px 0 12px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .inbox-line .q { color: var(--brand); font-weight: 600; }
+  .inbox-line a { color: var(--muted); }
+  .inbox-line a:hover { color: var(--fg); }
+
   .comment { padding: 8px 0; }
   .comment.reply { margin-left: 22px; }
   .comment .meta { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
@@ -749,7 +789,7 @@
   function clearScoped() {
     for (const un of subs.scoped) { try { un(); } catch { /* idempotent */ } }
     subs.scoped = [];
-    for (const k of ['grid', 'children', 'thing', 'marks', 'comments']) renderKeys.delete(k);
+    for (const k of ['grid', 'inbox', 'children', 'thing', 'marks', 'comments']) renderKeys.delete(k);
   }
 
   // Only an open thing dresses the header (see header.bar): the grid leaves it
@@ -817,6 +857,28 @@
     slot.appendChild(grid);
   }
 
+  // The inbox as one line of counts over the grid. get_workspace_view reports
+  // {requests, unseen} for the landing workspace (null before 2026-09-23, and
+  // the legacy path never reaches here), and the line stays hidden at zero:
+  // most of the time there is nothing waiting, and saying so every time would
+  // be noise. The list itself is a link into the app, where questions are
+  // answered on the person's own sign-in.
+  function renderInboxLine(inbox) {
+    const el = $('inboxLine');
+    if (!el) return;
+    const q = Math.max(0, Number(inbox && inbox.requests) || 0);
+    const u = Math.max(0, Number(inbox && inbox.unseen) || 0);
+    if (!changed('inbox', [q, u, state.currentWs])) return;
+    if (!q && !u) { el.hidden = true; el.innerHTML = ''; return; }
+    const parts = [];
+    if (q) parts.push('<span class="q">' + q + (q === 1 ? ' question' : ' questions') + ' waiting on you</span>');
+    if (u) parts.push('<span>' + u + ' new from your agent</span>');
+    el.innerHTML = '<span>📥</span>' + parts.join('<span aria-hidden="true">·</span>') +
+      '<a href="' + esc(APP_URL + '/workspaces/' + (state.currentWs || '') + '/inbox') +
+      '" target="_blank" rel="noopener">open the inbox ↗</a>';
+    el.hidden = false;
+  }
+
   // The base list_workspaces watch, registered at most once and only where it
   // is the sole source of the dropdown: the legacy path, for servers without
   // get_workspace_view. On a server that has it this is pure duplication — the
@@ -840,6 +902,7 @@
     syncViewChrome();
     state.gridPrev = null;
     $('view').innerHTML =
+      '<div class="inbox-line" id="inboxLine" hidden></div>' +
       '<div id="gridSlot">' + skeletonGrid(8) + '</div><div data-err="grid"></div>' +
       '<div class="note" id="gridMeta"></div>' +
       '<div class="openws"><a id="openWs" href="' + esc(APP_URL + '/workspaces/' + (state.currentWs || '')) + '" target="_blank" rel="noopener">Open this workspace in the app ↗</a></div>';
@@ -873,6 +936,7 @@
       }
       handleWorkspaces(p);
       if (state.view !== view) return; // handleWorkspaces re-landed under us
+      renderInboxLine(p && p.inbox);
       if (p && p.landing) renderGridThings(p.landing);
     }, 'grid', LIVE_OPTS, (err) => {
       // A server predating the tool, or a policy/consent layer blocking just
@@ -921,7 +985,8 @@
       '<rect x="3" y="16" width="5" height="5" rx="1.2"/><rect x="9.5" y="16" width="5" height="5" rx="1.2"/>' +
       '<rect x="16" y="16" width="5" height="5" rx="1.2"/></svg></button>' +
       '<span class="sep">›</span><span id="crumbTrail"></span>' +
-      '<h1 class="crumb-current"><span class="e" id="dEmoji"></span><span id="dName"></span></h1></div>' +
+      '<h1 class="crumb-current"><span class="e" id="dEmoji"></span><span id="dName"></span>' +
+      '<span id="dAgent" hidden></span></h1></div>' +
       '<div class="marks-row" id="dMarks"></div>' +
       '<button class="closebtn" id="dClose" aria-label="Close" title="Close">' +
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" ' +
@@ -931,6 +996,7 @@
       '<div class="openapp-row"><a class="openapp" id="dOpen" target="_blank" rel="noopener">open in app ↗</a></div>' +
       '<div data-err="marks"></div>' +
       '<div class="prose" id="dContent"></div><div data-err="thing"></div>' +
+      '<div id="dRequest"></div>' +
       '<div id="dChildren">' + skeletonGrid(4) + '</div><div data-err="children"></div>' +
       '<div id="dCommentsSect" hidden><div class="sect-label">Comments <span class="cnt" id="dCommentCount"></span></div>' +
       '<div id="dComments"></div><div data-err="comments"></div></div>' +
@@ -975,6 +1041,57 @@
       $('dName').textContent = p.name || t.name;
       state.view.name = p.name || t.name;
       $('dContent').innerHTML = p.content ? mdRender(p.content) : '';
+      renderAgent(p);
+      renderRequest(p, t.id);
+    };
+
+    // Who wrote this, when it was an agent rather than the person whose
+    // account it is. The last editor wins over the creator: it is the more
+    // recent fact, and the line has room for one chip. A server predating
+    // 2026-09-22 sends neither field and nothing renders.
+    const renderAgent = (p) => {
+      const el = $('dAgent');
+      const edited = p && p.updatedByAgent;
+      const label = edited || (p && p.createdByAgent);
+      if (!label) { el.hidden = true; el.textContent = ''; return; }
+      el.className = 'agent-chip';
+      el.textContent = '✦ ' + (edited ? 'edited by ' : 'by ') + label;
+      el.title = (edited ? 'Last changed by ' : 'Created by ') + label + ', an agent acting on your behalf';
+      el.hidden = false;
+    };
+
+    // The question an agent asked on this thing, read-only (see .request).
+    // Re-renders as answered on the next delivery once the person answers
+    // anywhere else.
+    const renderRequest = (p, id) => {
+      const slot = $('dRequest');
+      const r = p && p.request;
+      if (!r || !r.question) { slot.innerHTML = ''; return; }
+      const open = r.status === 'open';
+      let h = '<div class="request' + (open ? '' : ' closed') + '">' +
+        '<div class="asker">✦ ' + esc(r.createdBy || 'An agent') + (open ? ' is waiting on you' : ' asked') + '</div>' +
+        '<p class="q">' + esc(r.question) + '</p>';
+      const opts = r.options || [];
+      if (opts.length) {
+        h += '<ul class="opts">';
+        for (const o of opts) {
+          h += '<li>' + esc(o.label || o.id || '') + (o.description ? '<span class="d">' + esc(o.description) + '</span>' : '') + '</li>';
+        }
+        h += '</ul>';
+      }
+      if (open) {
+        h += '<p class="said"><a href="' + esc(APP_URL + '/workspaces/' + (p.workspaceId || state.currentWs || '') + '/things/' + id) +
+          '" target="_blank" rel="noopener">Answer in the app ↗</a>, on your phone, or tell your agent in a chat.</p>';
+      } else {
+        const a = r.answer || {};
+        const who = '<b>' + esc(a.userName || 'Someone') + '</b>';
+        const via = a.via === 'mcp' ? 'answered in a chat' : a.via === 'mobile' ? 'on the phone' : 'on the web';
+        h += '<p class="said">' + (r.status === 'dismissed'
+          ? who + ' dismissed this'
+          : who + ' chose <b>' + esc(a.optionLabel || 'to reply') + '</b>') + ' · ' + via + '</p>';
+        if (a.comment) h += '<p class="reply">' + esc(a.comment) + '</p>';
+      }
+      slot.innerHTML = h + '</div>';
     };
 
     const renderChildren = (p) => {
@@ -1012,7 +1129,8 @@
         const chip = document.createElement('span');
         chip.className = 'mark-chip' + (m.mine ? ' mine' : '');
         chip.innerHTML = '<span>' + esc(m.emoji || m.name) + '</span><span class="c">' + Number(m.count) + '</span>';
-        chip.title = (m.users || []).join(', ');
+        // An agent's mark counts as its person's; the tooltip says which agent.
+        chip.title = (m.users || []).concat((m.agents || []).map((a) => a + ' (agent)')).join(', ');
         row.appendChild(chip);
       }
     };
@@ -1038,7 +1156,11 @@
         const el = document.createElement('div');
         el.className = 'comment' + (reply ? ' reply' : '');
         const ts = parseTs(c.createdAt);
-        el.innerHTML = '<div class="meta"><b>' + esc(c.authorName || 'Someone') + '</b>' + (ts ? ' · ' + fmtAgo(ts) : '') + '</div><div>' + mdInline(c.content || '') + '</div>';
+        // The author stays the person whose token wrote it; the agent that
+        // typed it is an annotation on their name, not a byline.
+        el.innerHTML = '<div class="meta"><b>' + esc(c.authorName || 'Someone') + '</b>' +
+          (c.byAgent ? ' · via ' + esc(c.byAgent) : '') + (ts ? ' · ' + fmtAgo(ts) : '') +
+          '</div><div>' + mdInline(c.content || '') + '</div>';
         slot.appendChild(el);
         for (const r of byParent.get(c.id) || []) renderComment(r, true);
       };
