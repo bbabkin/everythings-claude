@@ -1,6 +1,6 @@
 {
   "name": "everythings",
-  "description": "Everythings for Claude Code: workspace/thing MCP tools in every project, plus the /things skill that opens your live Everythings Panel as a claude.ai artifact.",
+  "description": "Everythings for Claude Code: workspace/thing MCP tools in every project, including asking you a question and picking up your answer later, plus the /things skill that opens your live Everythings Panel as a claude.ai artifact.",
   "version": "0.1.10",
   "author": {
     "name": "Boris Babkin"

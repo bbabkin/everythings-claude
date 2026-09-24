@@ -4,7 +4,10 @@
 notes, lists, and items ("things"). This plugin gives Claude Code two powers:
 
 - **MCP tools in every project** — Claude can search, read, and (with a
-  write-scoped sign-in) create and edit your things from any session.
+  write-scoped sign-in) create and edit your things from any session. When it
+  needs a decision while you are away, it can ask: the question reaches your
+  phone through the Everythings app, and Claude picks up your answer on its
+  next run.
 - **`/things` — your live panel** — publishes a private claude.ai artifact
   showing your workspaces and things, with content, marks, comments, and a
   **follow mode** that auto-opens things as an agent creates them. Ask an
@@ -47,7 +50,9 @@ writes it.
 ## Notes
 
 - The panel is read-only and refreshes on a ~30 second poll (the connector
-  platform's floor).
+  platform's floor). It shows which things an agent wrote and any question it
+  is waiting on you for, but never answers one: answer in the app, or tell the
+  agent in the chat.
 - Panel improvements ship with plugin updates; running `/things` after an
   update republishes the new page to your same URL.
 
