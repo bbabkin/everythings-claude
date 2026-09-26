@@ -5,11 +5,23 @@ description: Open or update the user's Everythings Panel — a live claude.ai ar
 
 # Everythings Panel — open it for this user
 
-The panel is a private claude.ai Artifact that reads the viewer's Everythings
-data through their claude.ai **Everythings** connector (`window.claude.mcp`).
-The page ships with this plugin at `assets/panel.html` (relative to this
-skill's base directory), fully self-contained. Each user publishes their own
-copy; a connector-declaring artifact cannot be shared by URL.
+The panel is a private claude.ai Artifact. It shows the viewer's Everythings
+data by calling Everythings tools through claude.ai's artifact runtime
+(`window.claude.mcp`), which relays each call through the viewer's own
+claude.ai **Everythings** connector. The page ships with this plugin at
+`assets/panel.html` (relative to this skill's base directory), fully
+self-contained. Each user publishes their own copy; a connector-declaring
+artifact cannot be shared by URL.
+
+## No credentials, ever
+
+Neither this skill nor the page reads, stores, or forwards a credential. The
+Everythings MCP tools sign in with OAuth, which Claude Code runs and keeps; the
+panel's calls ride the connector the user connected on claude.ai, which holds
+its own OAuth sign-in. Never ask the user for an Everythings token, API key, or
+password, and never look for one in their environment or files. If a tool
+call fails for lack of sign-in, point them at the OAuth flow (`/mcp` in Claude
+Code, or the connector's Connect button on claude.ai).
 
 ## Procedure
 
@@ -61,8 +73,9 @@ step needs the Artifact tool.
 Publishing with the Artifact tool IS opening the panel — it renders in the
 claude.ai side panel. Never point a browser pane, Chrome, or any external
 browser at the artifact URL or at everythings.app on the panel's behalf: the
-page needs the viewer's claude.ai session and connector bridge, and anywhere
-else it shows only its "Open this page from claude.ai" banner.
+page works only inside claude.ai, whose artifact runtime provides the
+connector bridge, and anywhere else it shows only its "Open this page from
+claude.ai" banner.
 
 ## If the connector is missing
 
@@ -70,8 +83,9 @@ The page banners "Everythings isn't connected" when the viewer has no
 Everythings connector. Walk them through it: claude.ai **Settings →
 Connectors**, find **Everythings** in the connector directory and click
 Connect (fallback for builds without the directory: **Add custom connector**
-with URL `https://www.everythings.app/api/mcp`). Sign-in happens in the
-browser; keep the display name **Everythings**. Then reload the panel.
+with URL `https://www.everythings.app/api/mcp`). The user completes the
+OAuth sign-in on everythings.app themselves; keep the display name
+**Everythings**. Then reload the panel.
 
 ## Do not modify the bundled page
 

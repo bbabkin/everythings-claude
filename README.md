@@ -39,6 +39,23 @@ pick **everythings** under `/plugin install`.)
 Your panel is a private artifact on your claude.ai account — every user
 publishes their own; nothing is shared unless you share it.
 
+## Sign-in, credentials, and data
+
+- The plugin holds no credentials and never asks you for one. It reads no
+  environment variables, no files, and no tokens from your machine, and it has
+  no hooks, scripts, or local servers.
+- Sign-in is OAuth 2.1 with PKCE against `https://www.everythings.app/api/mcp`.
+  Claude Code runs that flow and stores the resulting token itself. For the
+  panel, the claude.ai connector you connect runs its own OAuth sign-in and
+  keeps its own token. The skill and the panel page never see either one.
+- Your workspaces, things, marks, and comments travel only between Claude and
+  `www.everythings.app`, through the MCP tools that you or Claude call. The
+  panel page makes no network requests of its own: claude.ai relays its tool
+  calls through your connector. It keeps one value in its browser storage, the
+  id of the workspace you last opened, so it reopens there.
+- Privacy policy: [everythings.app/privacy](https://www.everythings.app/privacy).
+  Terms: [everythings.app/terms](https://www.everythings.app/terms).
+
 ## Using Cowork?
 
 The MCP tools work there — a Cowork agent can research and file everything
