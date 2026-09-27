@@ -6,8 +6,9 @@ description: Open or update the user's Everythings Panel — a live claude.ai ar
 # Everythings Panel — open it for this user
 
 The panel is a private claude.ai Artifact. It shows the viewer's Everythings
-data by calling Everythings tools through claude.ai's artifact runtime
-(`window.claude.mcp`), which relays each call through the viewer's own
+data by calling Everythings tools through claude.ai's artifact runtime (the
+`mcp` capability, reached with `window.claude.use('mcp')`), which relays each
+call through the viewer's own
 claude.ai **Everythings** connector. The page ships with this plugin at
 `assets/panel.html` (relative to this skill's base directory), fully
 self-contained. Each user publishes their own copy; a connector-declaring

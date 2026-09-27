@@ -640,7 +640,26 @@
     return true;
   }
 
-  const mcp = window.claude ? window.claude.mcp : undefined;
+  // The connector bridge, set once by boot() and read by every call site
+  // after that. Nothing reads it before boot has it.
+  let mcp = null;
+
+  // Runtime contract 0.2.60 onward, window.claude carries only use(): the
+  // mcp namespace arrives through its promise, never during this script's
+  // first synchronous run, and null means this view cannot run it (not
+  // served, not granted, or its module failed; null after 10 s when no
+  // viewer answers). The namespace is frozen and platform-owned, so it is
+  // only ever called, never written to. Older runtimes had no use() and put
+  // the namespace straight on window.claude.mcp; only they take that branch,
+  // since on a use() runtime that member is promised to be undefined.
+  async function resolveMcp() {
+    const c = window.claude;
+    if (!c) return null;
+    if (typeof c.use === 'function') {
+      try { return (await c.use('mcp')) || null; } catch { return null; }
+    }
+    return c.mcp || null;
+  }
 
   // ---------------------------------------------------------------- errors
   const AUTHZ = new Set(['needs_reauth', 'server_not_connected', 'selection_required',
@@ -895,17 +914,23 @@
     subs.base.push(watch('list_workspaces', null, handleWorkspaces, 'workspaces'));
   }
 
+  // The grid's markup with a skeleton in the tile slot. boot() paints it
+  // before the connector bridge resolves, and openGrid() builds on it.
+  function renderGridShell() {
+    $('view').innerHTML =
+      '<div class="inbox-line" id="inboxLine" hidden></div>' +
+      '<div id="gridSlot">' + skeletonGrid(8) + '</div><div data-err="grid"></div>' +
+      '<div class="note" id="gridMeta"></div>' +
+      '<div class="openws"><a id="openWs" href="' + esc(APP_URL + '/workspaces/' + (state.currentWs || '')) + '" target="_blank" rel="noopener">Open this workspace in the app ↗</a></div>';
+  }
+
   function openGrid() {
     clearScoped();
     const view = { type: 'grid' };
     state.view = view;
     syncViewChrome();
     state.gridPrev = null;
-    $('view').innerHTML =
-      '<div class="inbox-line" id="inboxLine" hidden></div>' +
-      '<div id="gridSlot">' + skeletonGrid(8) + '</div><div data-err="grid"></div>' +
-      '<div class="note" id="gridMeta"></div>' +
-      '<div class="openws"><a id="openWs" href="' + esc(APP_URL + '/workspaces/' + (state.currentWs || '')) + '" target="_blank" rel="noopener">Open this workspace in the app ↗</a></div>';
+    renderGridShell();
 
     if (state.noWsView) {
       // Legacy two-call path for servers without get_workspace_view. With no
@@ -1509,8 +1534,18 @@
   }
 
   // ---------------------------------------------------------------- boot
-  function boot() {
+  async function boot() {
+    // First paint does not wait for the bridge. The header is static markup,
+    // and the grid skeleton goes up at once for the workspace remembered here
+    // (openGrid() below makes the same guess) while use('mcp') is pending,
+    // which on a framed view is at least one round trip to the viewer.
+    state.currentWs = store.get('ews.ws') || null;
+    renderGridShell();
+    setStatus('boot', 'connecting…');
+
+    mcp = await resolveMcp();
     if (!mcp) {
+      $('view').innerHTML = '';
       showBanner('Open this page from claude.ai', 'This panel reads your Everythings data through claude.ai connectors, which are only available when the artifact is opened from claude.ai.', true);
       setStatus('err', 'no connector bridge');
       return;
@@ -1546,8 +1581,6 @@
         : 'Follow off — the panel holds still until you refresh');
     });
 
-    setStatus('boot', 'connecting…');
-
     // Armed on every load, and armed BEFORE the first view is built so the
     // watches that view registers are born on the following cadence rather
     // than being re-registered (and re-executed) a moment later. Watching an
@@ -1556,14 +1589,13 @@
     // costs them the first few things. Arming only baselines against the
     // newest server timestamp, so nothing jumps until something is written
     // after this moment; a manual tile/crumb/workspace click still pauses it,
-    // five quiet minutes switch it off, and the toggle stops it for good.
+    // fifteen quiet minutes switch it off, and the toggle stops it for good.
     setFollow(true);
 
-    // Speculative first paint: open the grid immediately — its get_workspace_view
+    // Open the grid over the skeleton painted above: its get_workspace_view
     // watch answers the whole landing view (dropdown + tiles) in one round
     // trip, for the saved workspace when one is remembered, else the server's
     // default. handleWorkspaces corrects the guess if the app default changed.
-    state.currentWs = store.get('ews.ws') || null;
     openGrid();
   }
 
