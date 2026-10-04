@@ -26,9 +26,9 @@ import type {
   EverythingsView,
   EverythingsWrites,
 } from '../types';
-import { leaveAsk } from './ask';
+import { leaveAsk, type AskTarget } from './ask';
 import { block, isBlocked, showNote, unblock } from './blocked';
-import { drawnOf, isWholePage, recordDefaultMarks, recordGrid, recordPage } from './cache';
+import { drawnOf, gridOf, isWholePage, pageOf, recordDefaultMarks, recordGrid, recordPage } from './cache';
 import {
   IDLE_LOAD,
   isRecord,
@@ -359,9 +359,26 @@ async function readView(p: Ports, isShown: boolean): Promise<boolean> {
   return view.kind === 'grid' ? loadGrid(p, view.workspaceId, isShown) : loadThing(p, view.thingId, isShown);
 }
 
-/** Reads the view on screen again, unless blocked (/everythings and follow). */
+/** Reads the view on screen again, unless blocked (/things and follow). */
 export async function refreshView(p: Ports): Promise<void> {
   if (!(await isBlocked(p))) await readView(p, false);
+}
+
+/**
+ * The page to ask Claude for when the pane will not fill the screen by
+ * itself (no server answered, Claude Code refuses its reads, or the read
+ * failed) and the cache has nothing to draw there. Null when the screen
+ * draws something, or a read may still fill it.
+ */
+export async function unfilledPage(p: Ports): Promise<AskTarget | null> {
+  const { view, cache, load, blocked } = await readSnapshot(p);
+  if (blocked === null && load.error === null && !load.isNotConnected) return null;
+  if (view.kind === 'thing') {
+    return pageOf(cache, view.thingId) === null ? { kind: 'thing', id: view.thingId } : null;
+  }
+  const landing = gridOf(cache, view.workspaceId).landing;
+  if (landing !== null && (landing.things.length > 0 || landing.isListed)) return null;
+  return { kind: 'workspace', id: landing?.workspaceId ?? null };
 }
 
 /**

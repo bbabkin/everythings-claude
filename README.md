@@ -8,12 +8,12 @@ notes, lists, and items ("things"). This plugin gives Claude Code three powers:
   needs a decision while you are away, it can ask: the question reaches your
   phone through the Everythings app, and Claude picks up your answer on its
   next run.
-- **`/everythings`: a pane in Claude Code** that draws your workspaces and
+- **`/things`: a pane in Claude Code** that draws your workspaces and
   things beside the transcript and opens each thing as the agent writes it.
   Press a mark to add or remove your own, or leave a comment, without leaving
   the session. It needs a Claude Code build that runs plugin hook modules
   (the terminal or the desktop Code tab).
-- **`/things` — your live panel** — publishes a private claude.ai artifact
+- **`/everythings:panel` — your live panel** — publishes a private claude.ai artifact
   showing your workspaces and things, with content, marks, comments, and a
   **follow mode** that auto-opens things as an agent creates them. Ask an
   agent to plan a trip and watch the plan assemble itself.
@@ -39,7 +39,7 @@ pick **everythings** under `/plugin install`.)
 3. For the panel: in claude.ai **Settings → Connectors**, find
    **Everythings** in the connector directory and connect it (or add the same
    URL as a custom connector; keep the name **Everythings**), then run
-   `/things`.
+   `/everythings:panel`.
 
 Your panel is a private artifact on your claude.ai account — every user
 publishes their own; nothing is shared unless you share it.
@@ -49,7 +49,7 @@ publishes their own; nothing is shared unless you share it.
 - The plugin holds no credentials and never asks you for one. It reads no
   environment variables, no files, and no tokens from your machine, and it has
   no shell scripts or local servers.
-- The `/everythings` pane is a hooks module (`hooks/register.tsx`) that runs
+- The `/things` pane is a hooks module (`hooks/register.tsx`) that runs
   inside Claude Code. It watches one thing: the Everythings tool calls of the
   session it runs in, so it can draw what they carried. Its own calls go to
   the same Everythings MCP server through Claude Code, on the sign-in Claude
@@ -75,7 +75,7 @@ publishes their own; nothing is shared unless you share it.
 
 The MCP tools work there — a Cowork agent can research and file everything
 into your workspaces. Publishing the panel needs Claude Code (CLI or web) or
-claude.ai, so run `/things` once there, then keep the panel open in a browser
+claude.ai, so run `/everythings:panel` once there, then keep the panel open in a browser
 beside Cowork: with follow mode armed it opens each thing as the Cowork agent
 writes it.
 
@@ -91,7 +91,7 @@ writes it.
   platform's floor). It shows which things an agent wrote and any question it
   is waiting on you for, but never answers one: answer in the app, or tell the
   agent in the chat.
-- Panel improvements ship with plugin updates; running `/things` after an
+- Panel improvements ship with plugin updates; running `/everythings:panel` after an
   update republishes the new page to your same URL.
 
 ## License

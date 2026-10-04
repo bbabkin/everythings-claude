@@ -1,6 +1,6 @@
 ---
-name: things
-description: Open or update the user's Everythings Panel — a live claude.ai artifact showing their workspaces, things, marks, and comments, with a follow mode that opens things as an agent creates them. Invoked as /things. Use when the user asks to open, show, update, or refresh "the panel", "my Everythings panel", or "/things".
+name: panel
+description: Open or update the user's Everythings Panel — a live claude.ai artifact showing their workspaces, things, marks, and comments, with a follow mode that opens things as an agent creates them. Invoked as /everythings:panel. Use when the user asks to open, show, update, or refresh "the panel", "my Everythings panel", or "/everythings:panel".
 ---
 
 # Everythings Panel — open it for this user
@@ -59,7 +59,7 @@ updated from here — do not improvise a substitute page or fork the bundled
 one. Tell the user, in this order:
 
 1. The panel publishes from **Claude Code** (CLI or web) or claude.ai — run
-   `/things` there once; the connector-setup pointer above applies there too.
+   `/everythings:panel` there once; the connector-setup pointer above applies there too.
 2. An **already-published panel keeps working**: opened in any browser at its
    claude.ai URL it jumps to things as they are created (follow mode is on
    from the moment it loads) — including things this very session writes
@@ -137,8 +137,8 @@ skill's job is only to note it, never to fork the page.
 
 ## The pane is a different thing
 
-This plugin also ships `/everythings`, a pane inside Claude Code that draws the
+This plugin also ships `/things`, a pane inside Claude Code that draws the
 same data beside the transcript and takes the user's own marks and comments.
 It is a hooks module, with nothing to publish. When the user asks for "the
 pane" or wants to mark or comment from the session, point them to
-`/everythings`; this skill covers the claude.ai artifact only.
+`/things`; this skill covers the claude.ai artifact only.

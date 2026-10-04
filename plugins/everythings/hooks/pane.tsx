@@ -101,6 +101,7 @@ export const THING_PRUNED = 'The pane kept only the name of this thing, to save 
 export const THING_ASKED = 'Asked Claude to open it. The page fills in once Claude reads it.';
 export const WORKSPACE_UNLISTED = 'Claude has not listed this workspace in this chat yet.';
 export const WORKSPACE_ASKED = 'Asked Claude to list it. The grid fills in once Claude lists it.';
+export const WORKSPACE_ASKED_FIRST = 'Asked Claude to show your workspace. The grid fills in once Claude reads it.';
 
 /** The Button back to the workspace's grid: a grid of nine dots. */
 export const GRID_GLYPH = '⋮⋮⋮';
@@ -135,36 +136,50 @@ export function drawPane(
   const landing = grid?.landing ?? null;
   const hasData = page !== null || (landing !== null && (landing.things.length > 0 || landing.isListed));
 
-  if (load.isNotConnected && !hasData) {
-    return (
-      <Box flexDirection="row" columnGap={1}>
-        <Text>{NOT_CONNECTED}</Text>
-        <Button key="retry" label="Retry" onPress={act.refresh} />
-      </Box>
-    );
-  }
-
   const failure = load.error ?? (load.isNotConnected ? NOT_CONNECTED : null);
   const retry = <Button key="retry" label="Retry" onPress={act.refresh} />;
   // The pane will not fill this screen by itself: its reads are blocked, or the last one failed.
   const isSettled = blocked !== null || failure !== null;
-  // Asking Claude helps then, as long as the connector answers.
-  const canAsk = isSettled && !load.isNotConnected;
+  // Asking Claude helps then: its own calls reach the connector under whatever name it runs.
+  const canAsk = isSettled;
   const isAsked = snap.asked !== null && snap.asked === askKey(view, cache);
   // The reads' note, then a refused write's, both when both are up.
   const readNote = blocked !== null && !snap.isNoteDismissed ? blocked : null;
   const writeNote = writes.blocked;
 
-  let unlisted: RenderElement | null = null;
+  // A screen with nothing to draw says why and offers to ask Claude for it.
+  let unseen: RenderElement | null = null;
   if (grid !== null && !hasData && canAsk) {
     const workspaceId = landing?.workspaceId ?? null;
-    unlisted = drawAsk(els, {
+    unseen = drawAsk(els, {
       line: landing === null ? NOTHING_SEEN : WORKSPACE_UNLISTED,
       label: landing === null ? 'Ask Claude to show your workspace' : 'Ask Claude to list it',
-      asked: WORKSPACE_ASKED,
+      asked: landing === null ? WORKSPACE_ASKED_FIRST : WORKSPACE_ASKED,
       isAsked,
       onPress: () => act.ask({ kind: 'workspace', id: workspaceId }),
     });
+  } else if (view.kind === 'thing' && !hasData && canAsk) {
+    const thingId = view.thingId;
+    unseen = drawAsk(els, {
+      line: THING_NOT_SEEN,
+      label: 'Ask Claude to open it',
+      asked: THING_ASKED,
+      isAsked,
+      onPress: () => act.ask({ kind: 'thing', id: thingId }),
+    });
+  }
+
+  // No server answered and the session's calls carried nothing: the notice, and the ask under it.
+  if (load.isNotConnected && !hasData) {
+    return (
+      <Box flexDirection="column" rowGap={1}>
+        <Box flexDirection="row" columnGap={1}>
+          <Text>{NOT_CONNECTED}</Text>
+          <Button key="retry" label="Retry" onPress={act.refresh} />
+        </Box>
+        {unseen}
+      </Box>
+    );
   }
 
   // A read in flight shows on the Refresh Button, and a failed read's line
@@ -175,8 +190,7 @@ export function drawPane(
       {drawHeader(els, surface, snap, page, grid, act)}
       {readNote !== null && drawNote(els, [BLOCKED_NOTE, UNBLOCK_HOW], readNote, 'reads', act)}
       {writeNote !== null && drawNote(els, [WRITE_UNBLOCK_HOW[writeNote.on]], writeNote, 'writes', act)}
-      {view.kind === 'thing' && !hasData && isSettled && <Text dimColor>{THING_NOT_SEEN}</Text>}
-      {unlisted}
+      {unseen}
       {landing !== null && hasData && drawGrid(els, surface, landing, act)}
       {page !== null && drawThing(els, surface, page, writes, canAsk, isAsked, act)}
       {failure !== null && (

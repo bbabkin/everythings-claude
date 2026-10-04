@@ -1,7 +1,7 @@
 {
   "name": "everythings-claude",
   "metadata": {
-    "description": "Everythings for Claude Code: workspace/thing MCP tools, the /everythings pane, plus /things, your live panel artifact."
+    "description": "Everythings for Claude Code: workspace/thing MCP tools, the /things pane, plus /everythings:panel, your live panel artifact."
   },
   "owner": {
     "name": "Boris Babkin"
@@ -10,7 +10,7 @@
     {
       "name": "everythings",
       "source": "./plugins/everythings",
-      "description": "Everythings workspace/thing MCP tools in every project (an agent can also ask you a question and pick up the answer later), /everythings: a pane beside the transcript that follows what the agent writes, plus /things: your live Everythings Panel as a claude.ai artifact."
+      "description": "Everythings workspace/thing MCP tools in every project (an agent can also ask you a question and pick up the answer later), /things: a pane beside the transcript that follows what the agent writes, plus /everythings:panel: your live Everythings Panel as a claude.ai artifact."
     }
   ]
 }

@@ -16,10 +16,11 @@
 import { atom, read, update } from 'claude-code';
 import type { EngineInterface, Register, Timer } from 'claude-code';
 
+import { askClaude } from './ask';
 import { EMPTY_CACHE } from './cache';
 import { IDLE_LOAD, IDLE_WRITES, INITIAL_VIEW, PANE_ID, PANE_TITLE } from './data';
 import { observeCall } from './follow';
-import { readSnapshot, refreshView, resumeFollow } from './nav';
+import { readSnapshot, refreshView, resumeFollow, unfilledPage } from './nav';
 import { drawPane, paneActions } from './pane';
 import { cellOf, type Ports } from './ports';
 import { SHOW_THING, showThing } from './showThing';
@@ -107,20 +108,27 @@ function ports($: EngineInterface): Ports {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
-      name: 'everythings',
+      name: 'things',
       description: 'Open the Everythings pane: your workspaces and things, following what the agent writes',
     });
     await $.tool.register(SHOW_THING);
     return next(e);
   });
 
-  // `/everythings` opens the pane on the view it last showed, arms follow,
-  // and reads that view again.
-  on('command.run', { command: 'everythings' }, async $ => {
+  // `/things` opens the pane on the view it last showed, arms follow,
+  // and reads that view again. A screen that read leaves empty asks Claude
+  // for the page, so the pane never opens on a blank or an error alone:
+  // Claude's own calls reach the connector under whatever name it runs, and
+  // teach the pane its server. The engine refuses a prompt submitted from
+  // this hook (it would wait on the turn the hook holds), so the ask goes
+  // out from a one-shot `$.clock.after` once the command has returned, and
+  // only if the screen is still empty then.
+  on('command.run', { command: 'things' }, async $ => {
     const p = ports($);
     await p.openPane();
     await resumeFollow(p);
     await refreshView(p);
+    if ((await unfilledPage(p)) !== null) $.clock.after(ASK_MS, () => void askIfUnfilled($));
     return {};
   });
 
@@ -160,7 +168,7 @@ export const register: Register = on => {
   // the redrawn tree (a posted comment's field comes back under a new key)
   // and the pane loses the keyboard with it (seen live 2026-10-03 in the
   // desktop app), so the next click only took focus and pressed nothing.
-  // This is the mod's one timer: a one-shot `$.clock.after`, started by the
+  // A one-shot `$.clock.after`, started by the
   // person's act and replaced by the next one; it runs once. Nothing asks
   // again later: a second ask that fell between a click's focus and its
   // press was seen to swallow the press. The phone has no keyboard to give,
@@ -181,6 +189,20 @@ export const register: Register = on => {
     return picked;
   });
 };
+
+/** How long after `/things` returns an empty pane asks Claude for its page. */
+const ASK_MS = 100;
+
+/** Asks Claude for the page on screen when nothing draws there; once per page (ask.ts). */
+async function askIfUnfilled($: EngineInterface): Promise<void> {
+  try {
+    const p = ports($);
+    const target = await unfilledPage(p);
+    if (target !== null) await askClaude(p, target);
+  } catch {
+    // The pane keeps its notice and the ask Button.
+  }
+}
 
 /** How long after a press the pane asks for the keyboard back. */
 const REFOCUS_MS = 200;

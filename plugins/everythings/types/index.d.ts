@@ -171,7 +171,7 @@ declare module 'claude-code' {
       /** Shaped: a reload whose code names another shape reads it as absent. */
       cache: Shaped<EverythingsCache>;
       load: EverythingsLoad;
-      /** Push follow: on when /everythings runs, paused by a press on a thing, workspace or back. */
+      /** Push follow: on when /things runs, paused by a press on a thing, workspace or back. */
       follow: boolean;
       /** The MCP server name the pane's reads go to, for this session. */
       server: string | null;
