@@ -134,3 +134,11 @@ skill's job is only to note it, never to fork the page.
   beside an idle agent settles down instead of reading all night.
 - Read-only today: marks and comments display, but writing them stays in the
   app.
+
+## The pane is a different thing
+
+This plugin also ships `/everythings`, a pane inside Claude Code that draws the
+same data beside the transcript and takes the user's own marks and comments.
+It is a hooks module, with nothing to publish. When the user asks for "the
+pane" or wants to mark or comment from the session, point them to
+`/everythings`; this skill covers the claude.ai artifact only.

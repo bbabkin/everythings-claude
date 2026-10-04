@@ -321,9 +321,10 @@
     color: var(--muted);
   }
   .sect-label .cnt { font-weight: 400; letter-spacing: normal; text-transform: none; font-variant-numeric: tabular-nums; }
-  /* The pane's header is one inline line, the way the app's thing card reads:
-     each ancestor with its emoji in muted type, a chevron between, then this
-     thing in full weight with its own. The workspace is not part of it, the
+  /* The pane's header is one line of navigation: the grid crumb and each
+     ancestor with its emoji in muted type, a chevron after each, then the
+     marks and the close button. The thing itself is not on it; its name is
+     the title on the line below. The workspace is not part of it either, the
      header's picker names it already. */
   .thing-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; }
   .crumbs {
@@ -331,7 +332,7 @@
     flex: 1; min-width: 0; margin: 0;
     font-size: 14px; color: var(--muted);
   }
-  /* Ancestors sit in the same flex line as the current thing, not a box of
+  /* Ancestors sit in the same flex line as the grid crumb, not a box of
      their own, so the gap and wrapping stay uniform across the whole row. */
   #crumbTrail { display: contents; }
   .crumbs button {
@@ -347,14 +348,31 @@
   .crumbs .gridbtn { padding: 1px 0; }
   .crumbs .gridbtn svg { display: block; width: 15px; height: 15px; }
   .crumbs .sep { user-select: none; }
-  .crumb-current {
-    display: inline-flex; align-items: center; gap: 6px; min-width: 0;
-    margin: 0; font-size: 15px; font-weight: 600; color: var(--fg);
+  /* The thing's emoji and name on a centered line of their own under the
+     header, so a long name has the card's full width instead of whatever the
+     crumbs and marks leave over. */
+  .thing-title {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 10px 0 12px; text-align: center; overflow-wrap: anywhere;
+    font-size: 21px; font-weight: 500; line-height: 1.25; color: var(--fg);
   }
-  .crumb-current .e { font-size: 21px; line-height: 1; }
-  /* Its own line under the header, ending where the marks end: a secondary
-     action that has no business competing with the title for the top row. */
-  .openapp-row { text-align: right; margin: 3px 0 14px; }
+  .thing-title .e { font-size: 26px; line-height: 1; flex-shrink: 0; }
+  /* The card's last line: "open in app" centered on the card and the agent
+     chip at the right end of the same line. Equal side columns keep the link
+     on the center whatever the chip's width; a pane too narrow for both puts
+     the chip on a line of its own under the link. */
+  .thing-foot {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center; gap: 6px 10px; margin-top: 18px;
+  }
+  .thing-foot .foot-end { display: flex; justify-content: flex-end; min-width: 0; }
+  .thing-foot .agent-chip { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 400px) {
+    .thing-foot { grid-template-columns: 1fr; justify-items: center; }
+    .thing-foot > span:first-child { display: none; }
+    .thing-foot .foot-end { justify-self: stretch; }
+    .thing-foot .foot-end:has(> [hidden]) { display: none; }
+  }
   .openapp {
     display: inline-block;
     font-size: 11px; white-space: nowrap; color: var(--muted);
@@ -375,8 +393,8 @@
   .thing-head .closebtn svg { display: block; width: 27px; height: 27px; }
 
   /* In the header line, pushed to the right by the crumbs' flex:1 and ending
-     just short of the close button. Wraps under the title when a long name and
-     a crowd of marks cannot share one line. */
+     just short of the close button. Wraps under the crumbs when a long trail
+     and a crowd of marks cannot share one line. */
   .marks-row {
     display: flex; flex-wrap: wrap; justify-content: flex-end;
     gap: 6px; margin: 0; flex-shrink: 0;
@@ -391,14 +409,16 @@
   .mark-chip.mine { background: var(--brand-soft); }
 
   /* "✦ by Claude Code" — who wrote this, when it was not the person reading.
-     After the name on the header line, quiet enough not to compete with it.
-     Same chip as the in-chat view and the app's badge. */
+     At the right end of the card's last line, beside "open in app", quiet
+     enough not to compete with the content. Same chip as the in-chat view and
+     the app's badge. */
   .agent-chip {
     display: inline-flex; align-items: center;
     padding: 2px 7px; border-radius: 999px;
     background: var(--card-hover); color: var(--muted);
     font-size: 11px; font-weight: 500; white-space: nowrap;
   }
+  .agent-chip[hidden] { display: none; }
 
   /* An agent's question, shown and never answered here: the panel calls tools
      with the same token the agent holds, so an answer from this page could not
@@ -417,6 +437,9 @@
   .request .said b { color: var(--fg); font-weight: 600; }
   .request .said a { color: var(--link); }
   .request .reply { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .request .thread { margin: 0 0 10px; padding: 0 0 0 10px; list-style: none; border-left: 2px solid var(--border); }
+  .request .thread li { margin-top: 6px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .request .thread .who { display: block; font-size: 11px; color: var(--muted); }
 
   /* What agents left for the viewer in this workspace, as counts from
      get_workspace_view. One line over the grid, only while there is something
@@ -1009,27 +1032,30 @@
       '<rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/><rect x="16" y="9.5" width="5" height="5" rx="1.2"/>' +
       '<rect x="3" y="16" width="5" height="5" rx="1.2"/><rect x="9.5" y="16" width="5" height="5" rx="1.2"/>' +
       '<rect x="16" y="16" width="5" height="5" rx="1.2"/></svg></button>' +
-      '<span class="sep">›</span><span id="crumbTrail"></span>' +
-      '<h1 class="crumb-current"><span class="e" id="dEmoji"></span><span id="dName"></span>' +
-      '<span id="dAgent" hidden></span></h1></div>' +
+      '<span id="crumbTrail"></span></div>' +
       '<div class="marks-row" id="dMarks"></div>' +
       '<button class="closebtn" id="dClose" aria-label="Close" title="Close">' +
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" ' +
       'd="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Z' +
       'm-1.72 6.97a.75.75 0 1 0-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L12 13.06l1.72 1.72a.75.75 0 1 0 ' +
       '1.06-1.06L13.06 12l1.72-1.72a.75.75 0 1 0-1.06-1.06L12 10.94l-1.72-1.72Z" clip-rule="evenodd"/></svg></button></div>' +
-      '<div class="openapp-row"><a class="openapp" id="dOpen" target="_blank" rel="noopener">open in app ↗</a></div>' +
+      '<h1 class="thing-title"><span class="e" id="dEmoji"></span><span id="dName"></span></h1>' +
       '<div data-err="marks"></div>' +
       '<div class="prose" id="dContent"></div><div data-err="thing"></div>' +
       '<div id="dRequest"></div>' +
       '<div id="dChildren">' + skeletonGrid(4) + '</div><div data-err="children"></div>' +
       '<div id="dCommentsSect" hidden><div class="sect-label">Comments <span class="cnt" id="dCommentCount"></span></div>' +
       '<div id="dComments"></div><div data-err="comments"></div></div>' +
+      '<div class="thing-foot"><span></span>' +
+      '<a class="openapp" id="dOpen" target="_blank" rel="noopener">open in app ↗</a>' +
+      '<span class="foot-end"><span id="dAgent" hidden></span></span></div>' +
       '</div>';
 
-    // Every ancestor is followed by a chevron, because this thing always
-    // closes the line. A top-level thing has none and the line is just itself.
+    // Every crumb is followed by a chevron, pointing down at the title on the
+    // line below. A top-level thing has no ancestors, and the grid crumb then
+    // stands alone with nothing to point at.
     const trailEl = $('crumbTrail');
+    if (trail.length) trailEl.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
     for (const a of trail) {
       trailEl.appendChild(crumbBtn(a, () => openThing(a, trail.slice(0, trail.indexOf(a)))));
       trailEl.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
@@ -1067,6 +1093,7 @@
       state.view.name = p.name || t.name;
       $('dContent').innerHTML = p.content ? mdRender(p.content) : '';
       renderAgent(p);
+      lastThing = p;
       renderRequest(p, t.id);
     };
 
@@ -1088,13 +1115,41 @@
     // The question an agent asked on this thing, read-only (see .request).
     // Re-renders as answered on the next delivery once the person answers
     // anywhere else.
+    //
+    // A request is a thread (20261001120000): the earlier rounds, read from the
+    // thing's comments, sit above the current one. Comments and the thing
+    // arrive as separate sections, so each remembers its latest payload and
+    // either one arriving re-renders the block.
+    let lastThing = null;
+    let lastComments = [];
+    const earlierInThread = (r) => {
+      const root = r.threadId;
+      if (!root) return [];
+      const answerId = r.answer && r.answer.commentId;
+      const thread = lastComments
+        .filter((c) => (c.id === root || c.parentId === root) && c.id !== answerId)
+        .sort((a, b) => (a.id === root ? -1 : b.id === root ? 1 : (parseTs(a.createdAt) || 0) - (parseTs(b.createdAt) || 0)));
+      const last = thread[thread.length - 1];
+      if (last && String(last.content || '').trim() === String(r.question).trim()) thread.pop();
+      return thread;
+    };
     const renderRequest = (p, id) => {
       const slot = $('dRequest');
       const r = p && p.request;
       if (!r || !r.question) { slot.innerHTML = ''; return; }
       const open = r.status === 'open';
-      let h = '<div class="request' + (open ? '' : ' closed') + '">' +
-        '<div class="asker">✦ ' + esc(r.createdBy || 'An agent') + (open ? ' is waiting on you' : ' asked') + '</div>' +
+      let h = '<div class="request' + (open ? '' : ' closed') + '">';
+      const earlier = earlierInThread(r);
+      if (earlier.length) {
+        h += '<ol class="thread">';
+        for (const c of earlier) {
+          const ts = parseTs(c.createdAt);
+          h += '<li><span class="who">' + (c.byAgent ? '✦ ' + esc(c.byAgent) : esc(c.authorName || 'Someone')) +
+            (ts ? ' · ' + fmtAgo(ts) : '') + '</span>' + esc(c.content || '') + '</li>';
+        }
+        h += '</ol>';
+      }
+      h += '<div class="asker">✦ ' + esc(r.createdBy || 'An agent') + (open ? ' is waiting on you' : ' asked') + '</div>' +
         '<p class="q">' + esc(r.question) + '</p>';
       const opts = r.options || [];
       if (opts.length) {
@@ -1115,6 +1170,7 @@
           ? who + ' dismissed this'
           : who + ' chose <b>' + esc(a.optionLabel || 'to reply') + '</b>') + ' · ' + via + '</p>';
         if (a.comment) h += '<p class="reply">' + esc(a.comment) + '</p>';
+        if (r.status === 'resolved') h += '<p class="said">Resolved by ' + esc(r.resolvedBy || 'the agent') + '</p>';
       }
       slot.innerHTML = h + '</div>';
     };
@@ -1164,6 +1220,8 @@
       if (!state.view || state.view.id !== t.id) return;
       const all = (p && p.comments) || [];
       if (!changed('comments', all)) return;
+      lastComments = all;
+      if (lastThing) renderRequest(lastThing, t.id);
       $('dCommentCount').textContent = p.count ? '— ' + p.count : '';
       const slot = $('dComments');
       $('dCommentsSect').hidden = !all.length;
@@ -1198,7 +1256,7 @@
     // server answers all four in one round trip, the way get_workspace_view already
     // answers the landing view.
     if (!state.noThingView) {
-      subs.scoped.push(watch('get_thing_view', { thingId: t.id, childLimit: 200, commentLimit: 200 }, (p) => {
+      subs.scoped.push(watch('get_thing_view', { thingId: t.id, childLimit: 200, commentLimit: 200, via: 'card' }, (p) => {
         if (!state.view || state.view.id !== t.id || !p) return;
         // Thing first: it settles the name that the sub-thing breadcrumbs
         // build their trail from.
