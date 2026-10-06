@@ -1,7 +1,7 @@
 {
   "name": "everythings",
   "description": "Everythings for Claude Code: workspace/thing MCP tools in every project, including asking you a question and picking up your answer later, the /things pane that follows what the agent writes, /findthing to search every workspace into it, plus the /everythings:panel skill that opens your live Everythings Panel as a claude.ai artifact.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "author": {
     "name": "Boris Babkin"
   },

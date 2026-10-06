@@ -233,6 +233,44 @@
      are nudged bottom-right by inline transforms (see emojiHtml). */
   .stack { position: relative; display: inline-block; line-height: 1; }
   .stack i { position: absolute; inset: 0; font-style: normal; line-height: 1; }
+  /* The box the glyph sits in, shrunk to it, so the marks overlay the
+     emoji's own corner rather than the tile's edge (thingTileContent.tsx). */
+  .iconBox { position: relative; display: inline-block; line-height: 1; }
+  /* A thing's marks over its icon, ported from thingIconMarks.module.css:
+     each a third of the icon's width, filling from the top-right corner
+     leftward and then row by row down (row-reverse + wrap), the top row
+     perched half a cell above the icon. A percentage margin on an absolute
+     box resolves against its containing block's width, the icon's, so a
+     sixth of it is half a cell. */
+  .tmarks {
+    position: absolute; inset: 0;
+    margin-top: -16.6667%;
+    z-index: 5;
+    display: flex; flex-direction: row-reverse; flex-wrap: wrap; align-content: flex-start;
+    container-type: inline-size;
+    pointer-events: none;
+  }
+  .tmark {
+    flex: 0 0 33.3333%;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    font-size: 0.32em;
+    font-size: 26cqw;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    transition: transform 0.3s;
+  }
+  /* On hover the marks rise with the icon and fan out sideways: the outer
+     columns move a quarter of the overlay's width outward (75% of a cell),
+     the middle one stays, and every mark rises half its height. The row runs
+     right to left, so a row's first cell is the right column. */
+  .thing:hover .tmark, .thing:focus .tmark { transform: translateY(-50%); }
+  .thing:hover .tmark:nth-child(3n + 1), .thing:focus .tmark:nth-child(3n + 1) { transform: translate(75%, -50%); }
+  .thing:hover .tmark:nth-child(3n), .thing:focus .tmark:nth-child(3n) { transform: translate(-75%, -50%); }
+  @media (prefers-reduced-motion: reduce) {
+    .thing:hover .tmark, .thing:focus .tmark { transform: none; }
+  }
   .thingName {
     position: relative; z-index: 2;
     display: flex; justify-content: center;
@@ -636,6 +674,27 @@
     return h + '</span>';
   }
 
+  // ------------------------------------------------------- marks on a tile
+  // Ported from components/thing/iconMarks.ts: the marks a listed thing
+  // carries (the view tools' per-row `marks`, everyone's), most-used first so
+  // the top-right cell holds the reaction most people left, the name breaking
+  // ties, at most a 3×3 grid. A row from list_things / list_child_things has
+  // no `marks` and draws none.
+  const MAX_ICON_MARKS = 9;
+  function marksHtml(marks) {
+    const shown = (Array.isArray(marks) ? marks : [])
+      .filter((m) => m && Number(m.count) > 0 && m.emoji && m.name !== 'view')
+      .sort((a, b) => Number(b.count) - Number(a.count) || String(a.name).localeCompare(String(b.name)))
+      .slice(0, MAX_ICON_MARKS);
+    if (!shown.length) return '';
+    let h = '<span class="tmarks">';
+    for (const m of shown) {
+      const label = esc(m.name + ' ×' + Number(m.count));
+      h += '<span class="tmark" role="img" aria-label="' + label + '" title="' + label + '">' + esc(m.emoji) + '</span>';
+    }
+    return h + '</span>';
+  }
+
   // ---------------------------------------------------------------- state
   const state = {
     workspaces: [],
@@ -849,7 +908,7 @@
     const shown = clipName(name);
     if (shown !== name) b.title = name;
     b.innerHTML = '<span class="thingHilite"></span>' +
-      '<span class="thingEmoji">' + emojiHtml(t.emoji || '\u{1F4C4}') + '</span>' +
+      '<span class="thingEmoji"><span class="iconBox">' + emojiHtml(t.emoji || '\u{1F4C4}') + marksHtml(t.marks) + '</span></span>' +
       '<span class="thingName">' + esc(shown) + '</span>' +
       '<span class="thingShadow"></span>';
     b.addEventListener('click', () => { userNav(); onClick(); });
