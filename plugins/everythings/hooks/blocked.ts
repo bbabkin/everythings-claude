@@ -9,13 +9,15 @@
 // keeps it quietly.
 //
 // While blocked, the pane shows one note: why it draws only what Claude has
-// read, and the permission rules for its three read tools, with a Button
-// that copies them. An allow rule for the two page reads was seen to lift
-// the refusal. A refusal of a write (writes.ts) shows the same kind of note
-// with that write's rules, beside the reads' note. The reads' note's Dismiss
-// holds for the session (`$.state`) and for later sessions (`$.store`),
-// until a Refresh the person presses is refused: that shows the note again,
-// since it says why nothing changed, and clears the stored dismissal.
+// read, and the permission rules for its four read tools, with a Button that
+// copies them. An allow rule for the two page reads was seen to lift the
+// refusal. The search's rule is there too though a refused search blocks
+// nothing (nav.ts): one copy then lets `/findthing` run as well. A refusal
+// of a write (writes.ts) shows the same kind of note with that write's
+// rules, beside the reads' note. The reads' note's Dismiss holds for the
+// session (`$.state`) and for later sessions (`$.store`), until a Refresh
+// the person presses is refused: that shows the note again, since it says
+// why nothing changed, and clears the stored dismissal.
 
 import type { RenderSurface } from 'claude-code';
 
@@ -31,8 +33,8 @@ const PANE_TOOLS = [...Object.values(READ_TOOLS), ...Object.values(WRITE_TOOLS)]
 /** A tool name the engine's refusal named, which gives the server as permission rules spell it. */
 const NAMED_TOOL = new RegExp(`\\bmcp__([A-Za-z0-9_-]+?)__(?:${PANE_TOOLS})\\b`);
 
-/** The three read tools the note asks to allow. */
-export const READ_RULE_TOOLS: readonly string[] = [READ_TOOLS.thing, READ_TOOLS.grid, READ_TOOLS.defaults];
+/** The read tools the note asks to allow: every read the pane makes, so one copy covers the whole pane. */
+export const READ_RULE_TOOLS: readonly string[] = [READ_TOOLS.thing, READ_TOOLS.grid, READ_TOOLS.defaults, READ_TOOLS.search];
 
 /**
  * The allow rules for `tools` on the server that refused. The server part
