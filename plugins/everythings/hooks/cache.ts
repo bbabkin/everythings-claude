@@ -42,10 +42,13 @@ import {
   parseThing,
   parseThingView,
   parseWorkspaces,
+  searchKey,
   str,
   toRowMarks,
   type DrawnGrid,
+  type DrawnHit,
   type DrawnPage,
+  type DrawnSearch,
   type GridRecord,
   type ThingRecord,
   type ThingViewRecord,
@@ -57,6 +60,7 @@ const ORDER_IDS_MAX = 300;
 const ORDERS_MAX = 50;
 const DELETED_MAX = 200;
 const WORKSPACES_MAX = 200;
+const SEARCHES_MAX = 10;
 
 /** Who a comment the agent added in this session shows as, until a read brings the server's row. */
 export const SESSION_AUTHOR = 'This session';
@@ -71,6 +75,7 @@ export const EMPTY_CACHE: EverythingsCache = {
   order: {},
   deleted: {},
   defaultMarks: {},
+  searches: {},
 };
 
 const PAGE_FIELDS: readonly string[] = ['content', 'isContentCut', 'request', 'marks', 'children', 'comments'];
@@ -88,6 +93,7 @@ type Draft = {
   order: EverythingsCache['order'];
   deleted: Record<string, number>;
   defaultMarks: EverythingsCache['defaultMarks'];
+  searches: EverythingsCache['searches'];
 };
 
 /** `since`: the tick a read started at; an observed call is as new as the cache. */
@@ -101,6 +107,7 @@ function open(cache: EverythingsCache, since = cache.tick): Draft {
     order: { ...cache.order },
     deleted: { ...cache.deleted },
     defaultMarks: { ...cache.defaultMarks },
+    searches: { ...cache.searches },
   };
 }
 
@@ -313,6 +320,7 @@ function close(d: Draft, pinned: string | null): EverythingsCache {
     order: d.order,
     deleted: Object.fromEntries(deleted),
     defaultMarks: Object.fromEntries(Object.entries(d.defaultMarks).slice(-WORKSPACES_MAX)),
+    searches: Object.fromEntries(Object.entries(d.searches).slice(-SEARCHES_MAX)),
   };
 }
 
@@ -325,6 +333,21 @@ function nameWorkspacesOf(d: Draft, items: unknown): void {
   for (const item of Array.isArray(items) ? items : []) {
     if (isRecord(item)) nameWorkspace(d, id(item.workspaceId), str(item.workspaceName));
   }
+}
+
+/**
+ * A search_things answer: its hits go in as names and places, and, for a
+ * query, the list of them in the server's order, as the latest search.
+ */
+function applySearch(d: Draft, query: string, r: Record<string, unknown>): void {
+  const records = parseRefs(r.results);
+  for (const record of records) put(d, record);
+  nameWorkspacesOf(d, r.results);
+  const key = searchKey(query);
+  if (!key) return;
+  const ids = records.map(record => record.id).filter(one => d.things[one] !== undefined);
+  delete d.searches[key];
+  d.searches[key] = { query, ids, count: Math.max(num(r.count, ids.length), ids.length) };
 }
 
 /** A new thing's page, from what create_thing or request_input was given. */
@@ -406,8 +429,7 @@ export function recordCall(
       break;
     }
     case 'search_things':
-      for (const record of parseRefs(r.results)) put(d, record);
-      nameWorkspacesOf(d, r.results);
+      applySearch(d, typeof args.query === 'string' ? args.query : '', r);
       break;
     case 'recent_things':
       for (const record of parseRefs(r.things)) put(d, record);
@@ -601,6 +623,51 @@ export function recordGrid(cache: EverythingsCache, grid: GridRecord, since: num
   return close(d, pinned);
 }
 
+/** The pane's own search_things answer for `query`, read from tick `since` on. */
+export function recordSearch(
+  cache: EverythingsCache,
+  query: string,
+  data: Record<string, unknown>,
+  since: number,
+  pinned: string | null,
+): EverythingsCache {
+  const d = open(cache, since);
+  applySearch(d, query, data);
+  return close(d, pinned);
+}
+
+/**
+ * The hits recorded for one query, recorded for another too: the agent ran
+ * the search the pane asked for in its own words.
+ */
+export function aliasSearch(cache: EverythingsCache, from: string, to: string): EverythingsCache {
+  const found = cache.searches[searchKey(from)];
+  const key = searchKey(to);
+  if (!found || !key || searchKey(from) === key) return cache;
+  const { [key]: _old, ...rest } = cache.searches;
+  return { ...cache, searches: { ...rest, [key]: found } };
+}
+
+/** A search's hits as known now; null while no answer for the query was recorded. */
+export function searchOf(cache: EverythingsCache, query: string): DrawnSearch | null {
+  const found = cache.searches[searchKey(query)];
+  if (!found) return null;
+  const hits: DrawnHit[] = found.ids.flatMap(one => {
+    const thing = cache.things[one];
+    if (!thing) return [];
+    const workspace = thing.workspaceId ? cache.workspaces.find(ws => ws.id === thing.workspaceId) : undefined;
+    return [
+      {
+        ...asRef(thing),
+        workspaceId: thing.workspaceId ?? null,
+        workspaceName: workspace?.name ?? null,
+        marks: thing.rowMarks ?? null,
+      },
+    ];
+  });
+  return { query: found.query, hits, count: found.count, truncated: hits.length < found.count };
+}
+
 /** One thing's page as known now; null when the session has seen nothing of it. */
 export function pageOf(cache: EverythingsCache, thingId: string): DrawnPage | null {
   const thing = cache.things[thingId];
@@ -628,6 +695,7 @@ export function isWholePage(cache: EverythingsCache, thingId: string): boolean {
 
 /** What a view draws from the cache, as one string: two caches that give the same draw the same. */
 export function drawnOf(cache: EverythingsCache, view: EverythingsView): string {
+  if (view.kind === 'search') return JSON.stringify(searchOf(cache, view.query));
   return JSON.stringify(view.kind === 'thing' ? pageOf(cache, view.thingId) : gridOf(cache, view.workspaceId));
 }
 

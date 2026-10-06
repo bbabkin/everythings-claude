@@ -58,8 +58,16 @@ const COMMENTS_KEPT = 100;
 const COMMENTS_TEXT_KEPT = 60_000;
 const NAME_MAX = 200;
 
-/** The reads the pane makes of its own: a grid, a thing's page, a workspace's default marks. */
-export const READ_TOOLS = { grid: 'get_workspace_view', thing: 'get_thing_view', defaults: 'get_workspace' } as const;
+/**
+ * The reads the pane makes of its own: a grid, a thing's page, a workspace's
+ * default marks, and the search `/findthing` runs.
+ */
+export const READ_TOOLS = {
+  grid: 'get_workspace_view',
+  thing: 'get_thing_view',
+  defaults: 'get_workspace',
+  search: 'search_things',
+} as const;
 
 /**
  * The writes the pane makes, each only on the person's own action: their
@@ -133,7 +141,21 @@ const ID_FROM_RESULT: ReadonlySet<string> = new Set([
 export type WriteTarget = { kind: 'open'; thingId: string } | { kind: 'deleted'; thingId: string };
 
 export function viewKey(view: EverythingsView): string {
+  if (view.kind === 'search') return `search:${searchKey(view.query)}`;
   return view.kind === 'grid' ? `grid:${view.workspaceId ?? ''}` : `thing:${view.thingId}`;
+}
+
+/** The most of a query the pane keeps, sends and shows. */
+export const QUERY_MAX = 200;
+
+/** A query as the person typed it, on one line and in bounds; empty when they typed none. */
+export function cleanQuery(value: unknown): string {
+  return clean(value, QUERY_MAX).replace(/\s+/g, ' ').trim();
+}
+
+/** What makes two queries the same search: case and spacing aside. */
+export function searchKey(query: string): string {
+  return cleanQuery(query).toLowerCase();
 }
 
 export function thingUrl(workspaceId: string, thingId: string): string {
@@ -503,6 +525,15 @@ export function parseGridView(data: unknown): GridRecord | null {
     landing: landing && landingId ? { workspaceId: landingId, things, count } : null,
   };
 }
+
+/** A search hit as its row draws it: the ref, its workspace, and its marks (null while unknown). */
+export type DrawnHit = EverythingsThingRef & {
+  workspaceId: string | null;
+  workspaceName: string | null;
+  marks: EverythingsRowMark[] | null;
+};
+/** A search as the pane draws it: the hits it still knows, in the server's order, and the server's total. */
+export type DrawnSearch = { query: string; hits: DrawnHit[]; count: number; truncated: boolean };
 
 /** Looks like HTML the server will convert, so the stored Markdown is not knowable from the input. */
 export function looksLikeHtml(text: string): boolean {

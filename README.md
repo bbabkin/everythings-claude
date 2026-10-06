@@ -11,7 +11,8 @@ notes, lists, and items ("things"). This plugin gives Claude Code three powers:
 - **`/things`: a pane in Claude Code** that draws your workspaces and
   things beside the transcript and opens each thing as the agent writes it.
   Press a mark to add or remove your own, or leave a comment, without leaving
-  the session. It needs a Claude Code build that runs plugin hook modules
+  the session. `/findthing <query>` searches every workspace and lists the
+  hits there. It needs a Claude Code build that runs plugin hook modules
   (the terminal or the desktop Code tab).
 - **`/everythings:panel` — your live panel** — publishes a private claude.ai artifact
   showing your workspaces and things, with content, marks, comments, and a
@@ -44,6 +45,27 @@ pick **everythings** under `/plugin install`.)
 Your panel is a private artifact on your claude.ai account — every user
 publishes their own; nothing is shared unless you share it.
 
+### The pane
+
+Start a new Claude Code session after installing or updating, then run
+`/things`. Under auto permission mode, Claude Code refuses the pane's own
+calls until you allow them in `permissions.allow` of `~/.claude/settings.json`:
+
+```json
+"mcp__plugin_everythings_everythings__get_thing_view",
+"mcp__plugin_everythings_everythings__get_workspace_view",
+"mcp__plugin_everythings_everythings__get_workspace",
+"mcp__plugin_everythings_everythings__search_things",
+"mcp__plugin_everythings_everythings__add_mark",
+"mcp__plugin_everythings_everythings__remove_mark",
+"mcp__plugin_everythings_everythings__add_comment"
+```
+
+The first four are read-only; the last three are the marks and comments you
+make from the pane. When the pane shows a note, its **Copy the rules** button
+gives the names your setup uses. The full guide is at
+[everythings.app/docs/agents/claude-code](https://www.everythings.app/docs/agents/claude-code#pane-setup).
+
 ## Sign-in, credentials, and data
 
 - The plugin holds no credentials and never asks you for one. It reads no
@@ -55,7 +77,9 @@ publishes their own; nothing is shared unless you share it.
   the same Everythings MCP server through Claude Code, on the sign-in Claude
   Code already holds. It writes only when you act: your mark when you press a
   mark, your comment when you submit one, and one prompt in your name when you
-  press "Ask Claude to open it". It keeps one flag in Claude Code's plugin
+  press "Ask Claude to open it", or when `/things` or `/findthing` opens on a
+  page or a search it cannot read itself (once per page or search, naming the
+  page by its id, or the search by the words you typed). It keeps one flag in Claude Code's plugin
   storage (that you dismissed a permissions note), copies permission rule
   text to the clipboard when you press Copy, and makes no network requests of
   its own.

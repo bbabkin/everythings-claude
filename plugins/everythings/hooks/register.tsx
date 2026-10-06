@@ -7,11 +7,11 @@
 // other files, written against Ports: nav.ts (screens and reads), cache.ts
 // (what the session's calls carried), server.ts (which MCP server),
 // blocked.ts (when Claude Code refuses the pane's calls), ask.ts (asking
-// Claude to open a page), writes.ts (the person's own mark and comment, the
-// pane's only writes), follow.ts (push follow), showThing.ts (the tool),
-// pane.tsx (the drawing), data.ts (payloads). A new feature is a file of
-// that kind plus its hook here; the state it reads is declared in
-// ../types/index.d.ts.
+// Claude to open a page or run a search), writes.ts (the person's own mark
+// and comment, the pane's only writes), follow.ts (push follow),
+// showThing.ts (the tool), pane.tsx (the drawing), data.ts (payloads). A
+// new feature is a file of that kind plus its hook here; the state it reads
+// is declared in ../types/index.d.ts.
 
 import { atom, read, update } from 'claude-code';
 import type { EngineInterface, Register, Timer } from 'claude-code';
@@ -20,7 +20,7 @@ import { askClaude } from './ask';
 import { EMPTY_CACHE } from './cache';
 import { IDLE_LOAD, IDLE_WRITES, INITIAL_VIEW, PANE_ID, PANE_TITLE } from './data';
 import { observeCall } from './follow';
-import { readSnapshot, refreshView, resumeFollow, unfilledPage } from './nav';
+import { readSnapshot, refreshView, resumeFollow, runSearch, unfilledPage } from './nav';
 import { drawPane, paneActions } from './pane';
 import { cellOf, type Ports } from './ports';
 import { SHOW_THING, showThing } from './showThing';
@@ -28,7 +28,7 @@ import { SHOW_THING, showThing } from './showThing';
 const viewAtom = atom({ plugin: 'everythings', key: 'view' } as const, INITIAL_VIEW);
 // Shaped: after a hot reload that changes the cache's shape, bump the tag
 // and the old value reads as absent instead of drawing in the old shape.
-const cacheAtom = atom({ plugin: 'everythings', key: 'cache' } as const, EMPTY_CACHE, { shape: 'v2' });
+const cacheAtom = atom({ plugin: 'everythings', key: 'cache' } as const, EMPTY_CACHE, { shape: 'v3' });
 const loadAtom = atom({ plugin: 'everythings', key: 'load' } as const, IDLE_LOAD);
 const followAtom = atom({ plugin: 'everythings', key: 'follow' } as const, true);
 const serverAtom = atom({ plugin: 'everythings', key: 'server' } as const, null);
@@ -111,6 +111,11 @@ export const register: Register = on => {
       name: 'things',
       description: 'Open the Everythings pane: your workspaces and things, following what the agent writes',
     });
+    await $.command.register({
+      name: 'findthing',
+      description: 'Search your Everythings things in every workspace and list them in the pane',
+      argumentHint: '<query>',
+    });
     await $.tool.register(SHOW_THING);
     return next(e);
   });
@@ -128,6 +133,20 @@ export const register: Register = on => {
     await p.openPane();
     await resumeFollow(p);
     await refreshView(p);
+    if ((await unfilledPage(p)) !== null) $.clock.after(ASK_MS, () => void askIfUnfilled($));
+    return {};
+  });
+
+  // `/findthing <query>` opens the pane on the search's hits, from one
+  // search_things call of the pane's own, and pauses follow. A search the
+  // pane could not run (refused, failed, or its reads blocked) is asked of
+  // Claude once, the way `/things` asks for an empty page: from a one-shot
+  // `$.clock.after` once the command has returned. The agent's own
+  // search_things answer then fills the list through the follow hook.
+  on('command.run', { command: 'findthing' }, async ($, e) => {
+    const p = ports($);
+    await p.openPane();
+    await runSearch(p, e.args);
     if ((await unfilledPage(p)) !== null) $.clock.after(ASK_MS, () => void askIfUnfilled($));
     return {};
   });
@@ -190,7 +209,7 @@ export const register: Register = on => {
   });
 };
 
-/** How long after `/things` returns an empty pane asks Claude for its page. */
+/** How long after `/things` or `/findthing` returns an empty pane asks Claude for its page. */
 const ASK_MS = 100;
 
 /** Asks Claude for the page on screen when nothing draws there; once per page (ask.ts). */

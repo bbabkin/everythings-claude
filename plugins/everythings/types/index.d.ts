@@ -5,10 +5,15 @@
 // keeps `blocked` and `noteDismissed`, hooks/ask.ts keeps `asked`,
 // hooks/writes.ts keeps `writes`.
 
-/** Which screen the pane shows. A null workspace is the landing rules' pick. */
+/**
+ * Which screen the pane shows. A null workspace is the landing rules' pick.
+ * A search (`/findthing`) keeps the workspace it was run from, for back; an
+ * empty query is one the person did not type.
+ */
 export type EverythingsView =
   | { kind: 'grid'; workspaceId: string | null }
-  | { kind: 'thing'; thingId: string; workspaceId: string | null };
+  | { kind: 'thing'; thingId: string; workspaceId: string | null }
+  | { kind: 'search'; query: string; workspaceId: string | null };
 
 export type EverythingsWorkspace = { id: string; name: string; isDefault: boolean };
 
@@ -104,6 +109,12 @@ export type EverythingsCache = {
   deleted: Record<string, number>;
   /** Each workspace's default marks, once a get_workspace answer carried them. */
   defaultMarks: Record<string, EverythingsDefaultMark[]>;
+  /**
+   * The hits of the latest search_things answers, the pane's and the
+   * agent's, by query (searchKey in hooks/data.ts): the query as sent, the
+   * hit ids in the server's order, and the server's total. At most 10.
+   */
+  searches: Record<string, { query: string; ids: string[]; count: number }>;
 };
 
 /** The latest read the pane made: in flight, failed, or done. */
@@ -171,7 +182,7 @@ declare module 'claude-code' {
       /** Shaped: a reload whose code names another shape reads it as absent. */
       cache: Shaped<EverythingsCache>;
       load: EverythingsLoad;
-      /** Push follow: on when /things runs, paused by a press on a thing, workspace or back. */
+      /** Push follow: on when /things runs, paused by /findthing and by a press on a thing, workspace or back. */
       follow: boolean;
       /** The MCP server name the pane's reads go to, for this session. */
       server: string | null;

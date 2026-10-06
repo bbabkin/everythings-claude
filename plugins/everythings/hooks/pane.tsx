@@ -5,7 +5,8 @@
 // Its other Buttons navigate, follow, refresh and retry, copy permission
 // rules, dismiss a note, and ask Claude to open a page. An agent's question
 // shows with its options and answer; the person answers it in the app. A
-// section nobody has read yet is absent.
+// section nobody has read yet is absent. A search (`/findthing`) draws its
+// hits as a list of rows, each naming its workspace.
 //
 // register.tsx's `ui.render` hook calls drawPane with the surface's element
 // table, a snapshot of the state, and the actions its presses run.
@@ -21,7 +22,7 @@ import type {
 } from '../types';
 import { askClaude, askKey, type AskTarget } from './ask';
 import { copyRules, dismissNote } from './blocked';
-import { gridOf, pageOf } from './cache';
+import { gridOf, pageOf, searchOf } from './cache';
 import {
   clip,
   NO_EMOJI,
@@ -30,7 +31,9 @@ import {
   thingUrl,
   type DrawnChild,
   type DrawnGrid,
+  type DrawnHit,
   type DrawnPage,
+  type DrawnSearch,
 } from './data';
 import {
   pressBack,
@@ -95,13 +98,17 @@ export const WRITE_UNBLOCK_HOW: Record<'mark' | 'comment', string> = {
   mark: "To allow marks from the pane, add these to Claude Code's permission settings:",
   comment: "To allow comments from the pane, add this to Claude Code's permission settings:",
 };
-export const NO_MARKS = 'No marks yet.';
 export const THING_UNREAD = 'Claude has not read this thing in this chat yet.';
 export const THING_PRUNED = 'The pane kept only the name of this thing, to save room.';
 export const THING_ASKED = 'Asked Claude to open it. The page fills in once Claude reads it.';
 export const WORKSPACE_UNLISTED = 'Claude has not listed this workspace in this chat yet.';
 export const WORKSPACE_ASKED = 'Asked Claude to list it. The grid fills in once Claude lists it.';
 export const WORKSPACE_ASKED_FIRST = 'Asked Claude to show your workspace. The grid fills in once Claude reads it.';
+export const NO_QUERY = 'Type what to find after the command: /findthing <query>';
+export const SEARCH_UNRUN = 'Claude has not run this search in this chat yet.';
+export const SEARCH_ASKED = 'Asked Claude to search. The list fills in once Claude searches.';
+export const SEARCHING = 'Searching…';
+export const NO_HITS = 'No things match.';
 
 /** The Button back to the workspace's grid: a grid of nine dots. */
 export const GRID_GLYPH = '⋮⋮⋮';
@@ -133,8 +140,10 @@ export function drawPane(
   const { view, load, cache, blocked, writes } = snap;
   const page = view.kind === 'thing' ? pageOf(cache, view.thingId) : null;
   const grid = view.kind === 'grid' ? gridOf(cache, view.workspaceId) : null;
+  const search = view.kind === 'search' && view.query ? searchOf(cache, view.query) : null;
   const landing = grid?.landing ?? null;
-  const hasData = page !== null || (landing !== null && (landing.things.length > 0 || landing.isListed));
+  const hasData =
+    page !== null || search !== null || (landing !== null && (landing.things.length > 0 || landing.isListed));
 
   const failure = load.error ?? (load.isNotConnected ? NOT_CONNECTED : null);
   const retry = <Button key="retry" label="Retry" onPress={act.refresh} />;
@@ -157,6 +166,15 @@ export function drawPane(
       asked: landing === null ? WORKSPACE_ASKED_FIRST : WORKSPACE_ASKED,
       isAsked,
       onPress: () => act.ask({ kind: 'workspace', id: workspaceId }),
+    });
+  } else if (view.kind === 'search' && view.query && !hasData && canAsk) {
+    const query = view.query;
+    unseen = drawAsk(els, {
+      line: SEARCH_UNRUN,
+      label: 'Ask Claude to search',
+      asked: SEARCH_ASKED,
+      isAsked,
+      onPress: () => act.ask({ kind: 'search', query }),
     });
   } else if (view.kind === 'thing' && !hasData && canAsk) {
     const thingId = view.thingId;
@@ -193,6 +211,7 @@ export function drawPane(
       {unseen}
       {landing !== null && hasData && drawGrid(els, surface, landing, act)}
       {page !== null && drawThing(els, surface, page, writes, canAsk, isAsked, act)}
+      {view.kind === 'search' && drawSearch(els, surface, snap, search, unseen !== null || failure !== null, act)}
       {failure !== null && (
         <Box flexDirection="row" columnGap={1}>
           <Text dimColor>{hasData ? `${FROM_CALLS} ${failure}` : failure}</Text>
@@ -220,7 +239,14 @@ function drawHeader(
   const picked = workspaces.some(ws => ws.id === current) ? (current ?? undefined) : undefined;
 
   let left: RenderElement | null = null;
-  if (view.kind === 'thing') {
+  if (view.kind === 'search') {
+    left = (
+      <Box flexDirection="row" columnGap={1} alignItems="center">
+        <Button key="back" label={GRID_GLYPH} onPress={act.back} />
+        {view.query !== '' && <Text bold>{`Search: ${view.query}`}</Text>}
+      </Box>
+    );
+  } else if (view.kind === 'thing') {
     // The breadcrumb: the workspace's grid, then the thing this one sits under.
     const parent = page?.parent ?? null;
     left = (
@@ -414,29 +440,57 @@ function rowLabel(child: DrawnChild, defaults: EverythingsDefaultMark[] | null):
 function drawRows(
   els: ElementTable,
   surface: RenderSurface,
-  children: DrawnChild[],
-  defaults: EverythingsDefaultMark[] | null,
+  list: { key: string; prefix: string },
+  rows: { id: string; label: string }[],
   act: PaneActions,
 ): RenderElement {
   const { Box, Button } = els;
   return (
-    <Box key="sub-things" flexDirection="column" alignItems="stretch" rowGap={1} paddingTop={1}>
-      {children.map(child =>
+    <Box key={list.key} flexDirection="column" alignItems="stretch" rowGap={1} paddingTop={1}>
+      {rows.map(row =>
         surface === 'terminal' ? (
-          <Button
-            key={`child:${child.id}`}
-            plain
-            label={rowLabel(child, defaults)}
-            onPress={() => act.openThing(child.id)}
-          />
+          <Button key={`${list.prefix}:${row.id}`} plain label={row.label} onPress={() => act.openThing(row.id)} />
         ) : (
-          <Button
-            key={`child:${child.id}`}
-            label={rowLabel(child, defaults)}
-            onPress={() => act.openThing(child.id)}
-          />
+          <Button key={`${list.prefix}:${row.id}`} label={row.label} onPress={() => act.openThing(row.id)} />
         ),
       )}
+    </Box>
+  );
+}
+
+/** A hit's row label: a sub-thing's (marks, pipe, emoji, name), then the workspace it is in. */
+function hitLabel(hit: DrawnHit, defaults: EverythingsDefaultMark[] | null): string {
+  const row = rowLabel(hit, defaults);
+  return hit.workspaceName !== null ? `${row} · ${hit.workspaceName}` : row;
+}
+
+/**
+ * A search's hits as rows, drawn as a thing's sub-things are, even when
+ * there is one, each naming its workspace; a press opens the thing. With no
+ * query, one line says to type one. `isExplained`: the ask or a failure line
+ * already says why no hits show.
+ */
+function drawSearch(
+  els: ElementTable,
+  surface: RenderSurface,
+  snap: PaneSnapshot,
+  search: DrawnSearch | null,
+  isExplained: boolean,
+  act: PaneActions,
+): RenderElement | null {
+  const { Box, Text } = els;
+  if (snap.view.kind !== 'search') return null;
+  if (snap.view.query === '') return <Text dimColor>{NO_QUERY}</Text>;
+  if (search === null) return isExplained ? null : <Text dimColor>{SEARCHING}</Text>;
+  if (search.hits.length === 0) return <Text dimColor>{NO_HITS}</Text>;
+  const rows = search.hits.map(hit => ({
+    id: hit.id,
+    label: hitLabel(hit, hit.workspaceId !== null ? (snap.cache.defaultMarks[hit.workspaceId] ?? null) : null),
+  }));
+  return (
+    <Box flexDirection="column">
+      {drawRows(els, surface, { key: 'hits', prefix: 'hit' }, rows, act)}
+      {search.truncated && <Text dimColor>{`Showing ${search.hits.length} of ${search.count}.`}</Text>}
     </Box>
   );
 }
@@ -485,8 +539,8 @@ function markLine(last: NonNullable<EverythingsWrites['last']>): string {
  * pointer. The label is the emoji, then the count when the thing carries
  * it; the person's own mark is primary and one nobody carries is dim. A
  * Button whose call is in flight draws dim and does nothing. Under the row, one dim line: a failure or a
- * refusal, else what the latest press did, else "No marks yet." on a thing
- * that carries none.
+ * refusal, else what the latest press did. A thing that carries no marks
+ * shows its row of dim defaults and no line.
  */
 function drawMarks(els: ElementTable, page: DrawnPage, writes: EverythingsWrites, act: PaneActions): RenderElement {
   const { Box, Text, Button } = els;
@@ -500,7 +554,7 @@ function drawMarks(els: ElementTable, page: DrawnPage, writes: EverythingsWrites
   ];
   const error = writes.error?.thingId === page.id && writes.error.on === 'mark' ? writes.error.text : null;
   const last = writes.last?.thingId === page.id ? writes.last : null;
-  const line = error ?? (last !== null ? markLine(last) : carried.length === 0 ? NO_MARKS : null);
+  const line = error ?? (last !== null ? markLine(last) : null);
   const isPending = (name: string) => writes.pending[`${page.id} ${name}`] !== undefined;
   return (
     <Box flexDirection="column">
@@ -527,7 +581,9 @@ function drawMarks(els: ElementTable, page: DrawnPage, writes: EverythingsWrites
  * The comments, then a field for the person's own comment, top level and
  * sent as typed. Each comment posted draws that thing a fresh field (its
  * key counts the thing's posts), so it comes back empty; a failure leaves
- * the field as typed, with its line under it. The
+ * the field as typed, with its line under it. The title has a blank row
+ * more above it than the page's other sections, so the comments read apart
+ * from the sub-things over them. The
  * phone's table has no field to draw, so it shows the comments alone.
  */
 function drawComments(
@@ -545,7 +601,11 @@ function drawComments(
   if (comments.list.length === 0 && Input === null) return null;
   return (
     <Box flexDirection="column" rowGap={1}>
-      {comments.list.length > 0 && <Text dimColor>{`Comments (${comments.count})`}</Text>}
+      {comments.list.length > 0 && (
+        <Box key="comments-title" paddingTop={1}>
+          <Text dimColor>{`Comments (${comments.count})`}</Text>
+        </Box>
+      )}
       {comments.list.map(comment => (
         <Box flexDirection="column" paddingLeft={comment.parentId !== null ? 2 : 0}>
           <Box flexDirection="row" columnGap={1}>
@@ -620,7 +680,13 @@ function drawThing(
       {page.request !== null && drawRequest(els, page.request)}
       {children !== null && children.things.length > 0 && (
         <Box flexDirection="column">
-          {drawRows(els, surface, children.things, page.defaultMarks, act)}
+          {drawRows(
+            els,
+            surface,
+            { key: 'sub-things', prefix: 'child' },
+            children.things.map(child => ({ id: child.id, label: rowLabel(child, page.defaultMarks) })),
+            act,
+          )}
           {children.truncated && (
             <Text dimColor>{`Showing ${children.things.length} of ${children.count}.`}</Text>
           )}

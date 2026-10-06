@@ -17,6 +17,11 @@
 // comes between a click's focus move and its press drops the press. So a
 // read shows "Loading…" only when the person pressed Refresh or Retry, and
 // its answer is written only when it changes what the pane draws.
+//
+// `/findthing` shows a search: one search_things call on the learned server,
+// its hits a list. It never reads while blocked, and a search the pane could
+// not run is one register.tsx asks Claude to run (unfilledPage); the agent's
+// answer fills the list through follow (agentCompletedView).
 
 import type {
   EverythingsBlocked,
@@ -26,10 +31,22 @@ import type {
   EverythingsView,
   EverythingsWrites,
 } from '../types';
-import { leaveAsk, type AskTarget } from './ask';
+import { askKey, leaveAsk, type AskTarget } from './ask';
 import { block, isBlocked, showNote, unblock } from './blocked';
-import { drawnOf, gridOf, isWholePage, pageOf, recordDefaultMarks, recordGrid, recordPage } from './cache';
 import {
+  aliasSearch,
+  drawnOf,
+  gridOf,
+  isWholePage,
+  pageOf,
+  recordDefaultMarks,
+  recordGrid,
+  recordPage,
+  recordSearch,
+  searchOf,
+} from './cache';
+import {
+  cleanQuery,
   IDLE_LOAD,
   isRecord,
   parseDefaultMarks,
@@ -37,16 +54,20 @@ import {
   parseThingView,
   READ_TOOLS,
   readResult,
+  searchKey,
   viewKey,
   type WriteTarget,
 } from './data';
 import type { Ports } from './ports';
-import { callEverythings, NotConnectedError, RefusedError } from './server';
+import { callEverythings, callLearnedServer, NotConnectedError, RefusedError } from './server';
 import { isLive, leaveWrites } from './writes';
 
 const LAST_WORKSPACE = 'lastWorkspaceId';
 const DEFAULT_WORKSPACE = 'defaultWorkspaceId';
 const UNREADABLE = 'The Everythings server sent a reply the pane cannot read.';
+/** Why the pane's own search did not run; it asks Claude to run it instead. */
+export const SEARCH_REFUSED = "Claude Code's permission mode blocked the pane's search.";
+export const SEARCH_UNREACHED = 'The pane has not reached Everythings yet in this session.';
 /** A page a read filled this recently is shown from the cache on a press, with no read. */
 export const FRESH_MS = 30_000;
 
@@ -66,6 +87,7 @@ export async function forgetFresh(p: Ports): Promise<void> {
 
 /** True when the cache holds the whole view and a read filled it less than FRESH_MS ago. */
 async function isFresh(p: Ports, view: EverythingsView): Promise<boolean> {
+  if (view.kind === 'search') return false;
   const cache = await p.cache.read();
   const isWhole =
     view.kind === 'thing'
@@ -300,6 +322,35 @@ async function loadThing(p: Ports, thingId: string, isShown: boolean): Promise<b
   return isRefused(outcome);
 }
 
+/**
+ * One search_things call on the learned server, no other name tried. A
+ * refusal blocks nothing (the page reads may be allowed when the search is
+ * not); it fails the search, and the pane asks Claude to run it.
+ */
+async function loadSearch(p: Ports, query: string, isShown: boolean): Promise<void> {
+  const view: EverythingsView = { kind: 'search', query, workspaceId: null };
+  const seq = await startLoad(p, viewKey(view), isShown);
+  const since = (await p.cache.read()).tick;
+  let outcome: Outcome<Record<string, unknown>>;
+  try {
+    const answer = readResult(await callLearnedServer(p, READ_TOOLS.search, { query }));
+    outcome = 'error' in answer ? failed(answer.error) : { ok: true, value: answer.data };
+  } catch (error) {
+    if (error instanceof NotConnectedError) outcome = failed(SEARCH_UNREACHED);
+    else if (error instanceof RefusedError) outcome = failed(SEARCH_REFUSED);
+    else outcome = failed(error instanceof Error ? error.message : String(error));
+  }
+  if (outcome.ok && (await isLatest(p, seq))) {
+    const data = outcome.value;
+    await recordRead(p, [view], cache => recordSearch(cache, query, data, since, null));
+  }
+  await p.load.update(load =>
+    load.seq !== seq
+      ? load
+      : { ...load, isLoading: false, error: outcome.ok ? null : outcome.error, isNotConnected: false },
+  );
+}
+
 /** The workspace a thing view starts under, before its read says. */
 async function workspaceOf(p: Ports, thingId: string): Promise<string | null> {
   const known = (await p.cache.read()).things[thingId]?.workspaceId;
@@ -356,6 +407,10 @@ export async function openThing(p: Ports, thingId: string, mayReuse = false): Pr
  */
 async function readView(p: Ports, isShown: boolean): Promise<boolean> {
   const view = await p.view.read();
+  if (view.kind === 'search') {
+    if (view.query) await loadSearch(p, view.query, isShown);
+    return false;
+  }
   return view.kind === 'grid' ? loadGrid(p, view.workspaceId, isShown) : loadThing(p, view.thingId, isShown);
 }
 
@@ -373,6 +428,9 @@ export async function refreshView(p: Ports): Promise<void> {
 export async function unfilledPage(p: Ports): Promise<AskTarget | null> {
   const { view, cache, load, blocked } = await readSnapshot(p);
   if (blocked === null && load.error === null && !load.isNotConnected) return null;
+  if (view.kind === 'search') {
+    return view.query && searchOf(cache, view.query) === null ? { kind: 'search', query: view.query } : null;
+  }
   if (view.kind === 'thing') {
     return pageOf(cache, view.thingId) === null ? { kind: 'thing', id: view.thingId } : null;
   }
@@ -405,7 +463,21 @@ export async function pressWorkspace(p: Ports, workspaceId: string): Promise<voi
   await openGrid(p, workspaceId, true);
 }
 
-/** From a thing back to its workspace's grid. */
+/**
+ * `/findthing <query>`: the search on screen as a list, from one
+ * search_things call, unless blocked. It pauses follow, as a press on a
+ * thing does. With no query the screen says to type one, and nothing is read.
+ */
+export async function runSearch(p: Ports, typed: string): Promise<void> {
+  await p.follow.update(() => false);
+  const query = cleanQuery(typed);
+  const { workspaceId } = await p.view.read();
+  await show(p, { kind: 'search', query, workspaceId });
+  if (!query || (await isBlocked(p))) return;
+  await loadSearch(p, query, true);
+}
+
+/** From a thing or a search back to its workspace's grid. */
 export async function pressBack(p: Ports): Promise<void> {
   await p.follow.update(() => false);
   await openGrid(p, (await p.view.read()).workspaceId, true);
@@ -457,7 +529,16 @@ export async function agentCompletedView(
 ): Promise<void> {
   const view = await p.view.read();
   let isComplete = false;
-  if (name === READ_TOOLS.thing) {
+  if (name === READ_TOOLS.search && view.kind === 'search' && typeof args.query === 'string') {
+    // The agent ran the search on screen, maybe in its own words when the pane asked it to.
+    isComplete = searchKey(args.query) === searchKey(view.query);
+    const cache = await p.cache.read();
+    if (!isComplete && (await p.asked.read()) === askKey(view, cache)) {
+      const query = args.query;
+      await p.cache.update(now => aliasSearch(now, query, view.query));
+      isComplete = true;
+    }
+  } else if (name === READ_TOOLS.thing) {
     isComplete = view.kind === 'thing' && args.thingId === view.thingId;
   } else if (name === READ_TOOLS.grid && data && isRecord(data.landing)) {
     isComplete = view.kind === 'grid' && (view.workspaceId === null || data.landing.workspaceId === view.workspaceId);
