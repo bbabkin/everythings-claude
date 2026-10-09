@@ -3,7 +3,7 @@
 // transcript rows later) reads these. hooks/nav.ts and hooks/follow.ts write
 // them through hooks/cache.ts; hooks/server.ts keeps `server`, hooks/blocked.ts
 // keeps `blocked` and `noteDismissed`, hooks/ask.ts keeps `asked`,
-// hooks/writes.ts keeps `writes`.
+// hooks/writes.ts keeps `writes`, hooks/inbox.ts keeps `inbox` and `wake`.
 
 /**
  * Which screen the pane shows. A null workspace is the landing rules' pick.
@@ -13,7 +13,54 @@
 export type EverythingsView =
   | { kind: 'grid'; workspaceId: string | null }
   | { kind: 'thing'; thingId: string; workspaceId: string | null }
-  | { kind: 'search'; query: string; workspaceId: string | null };
+  | { kind: 'search'; query: string; workspaceId: string | null }
+  | { kind: 'inbox'; list: EverythingsInboxList; workspaceId: string | null };
+
+/** The band's two lists: open questions (list_requests) and open @Agent jobs (list_mentions). */
+export type EverythingsInboxList = 'questions' | 'jobs';
+
+/** One row of an inbox list: the thing it is on, and the question or the comment, on one line. */
+export type EverythingsInboxItem = {
+  /** The row's own id: the thing for a question, the comment for a job. */
+  key: string;
+  thingId: string;
+  name: string;
+  emoji: string | null;
+  workspaceName: string | null;
+  text: string;
+};
+
+/**
+ * The band above the prompt (hooks/inbox.ts): each list as the latest answer
+ * carried it, the agent's own full listing or the band's read. Null is unknown,
+ * which draws nothing.
+ */
+export type EverythingsInbox = {
+  questions: EverythingsInboxItem[] | null;
+  jobs: EverythingsInboxItem[] | null;
+  /** Claude Code refused the band's own read: it reads again only on Refresh. */
+  isRefused: boolean;
+};
+
+/** A question this session's agent asked (request_input), waited on by the wake poll. */
+export type EverythingsWait = {
+  thingId: string;
+  /** Names the question once: the thing and its round, else the time it was asked. */
+  key: string;
+  /** Its round, when request_input's answer said; an answer to an earlier round does not count. */
+  round: number | null;
+  /** When the ask resolved, in ms since the epoch; the poll gives up two hours on. */
+  askedAt: number;
+};
+
+/** Wake on answer (hooks/inbox.ts). */
+export type EverythingsWake = {
+  waits: EverythingsWait[];
+  /** Keys of the questions whose answer woke the session, so each wakes it once. At most 100. */
+  woke: string[];
+  /** Claude Code refused a poll: nothing polls again in this session. */
+  isStopped: boolean;
+};
 
 export type EverythingsWorkspace = { id: string; name: string; isDefault: boolean };
 
@@ -135,7 +182,7 @@ export type EverythingsLoad = {
  * the person presses Refresh (hooks/blocked.ts).
  */
 export type EverythingsBlocked = {
-  /** The permission rules that let the pane's calls through, as Claude Code spells them: three for its reads, one or two for a write. */
+  /** The permission rules that let the pane's calls through, as Claude Code spells them: six for its reads, one or two for a write. */
   rules: string[];
   /** What the last press of the note's copy Button ("Copy the rules" or "Copy the rule") came to; null before one. */
   copy: 'copied' | 'failed' | null;
@@ -201,6 +248,10 @@ declare module 'claude-code' {
       defaultsAsked: string[];
       /** Shaped: a reload whose code names another shape reads it as absent. */
       writes: Shaped<EverythingsWrites>;
+      /** The band's counts and lists: open questions and open @Agent jobs. */
+      inbox: EverythingsInbox;
+      /** The questions the wake poll waits on, and the ones that already woke the session. */
+      wake: EverythingsWake;
     };
   }
 }

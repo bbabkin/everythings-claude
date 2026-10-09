@@ -27,6 +27,8 @@ import type {
   EverythingsBlocked,
   EverythingsCache,
   EverythingsDefaultMark,
+  EverythingsInbox,
+  EverythingsInboxList,
   EverythingsLoad,
   EverythingsView,
   EverythingsWrites,
@@ -58,6 +60,7 @@ import {
   viewKey,
   type WriteTarget,
 } from './data';
+import { refreshInbox } from './inbox';
 import type { Ports } from './ports';
 import { callEverythings, callLearnedServer, NotConnectedError, RefusedError } from './server';
 import { isLive, leaveWrites } from './writes';
@@ -87,7 +90,7 @@ export async function forgetFresh(p: Ports): Promise<void> {
 
 /** True when the cache holds the whole view and a read filled it less than FRESH_MS ago. */
 async function isFresh(p: Ports, view: EverythingsView): Promise<boolean> {
-  if (view.kind === 'search') return false;
+  if (view.kind === 'search' || view.kind === 'inbox') return false;
   const cache = await p.cache.read();
   const isWhole =
     view.kind === 'thing'
@@ -127,6 +130,8 @@ export type PaneSnapshot = {
   asked: string | null;
   /** The person's own marks and comments in flight, and how the last one went. */
   writes: EverythingsWrites;
+  /** The band's lists, which the pane lists on an inbox screen. */
+  inbox: EverythingsInbox;
 };
 
 export async function readSnapshot(p: Ports): Promise<PaneSnapshot> {
@@ -138,6 +143,7 @@ export async function readSnapshot(p: Ports): Promise<PaneSnapshot> {
   const isNoteDismissed = await p.noteDismissed.read();
   const asked = await p.asked.read();
   const stored = await p.writes.read();
+  const inbox = await p.inbox.read();
   // Markers an earlier load left (older than 30 seconds) draw as nothing in flight.
   const now = await p.now();
   const isStale = (at: number) => !isLive(at, now);
@@ -159,6 +165,7 @@ export async function readSnapshot(p: Ports): Promise<PaneSnapshot> {
     isNoteDismissed,
     asked,
     writes,
+    inbox,
   };
 }
 
@@ -411,6 +418,10 @@ async function readView(p: Ports, isShown: boolean): Promise<boolean> {
     if (view.query) await loadSearch(p, view.query, isShown);
     return false;
   }
+  if (view.kind === 'inbox') {
+    await refreshInbox(p, [], isShown);
+    return false;
+  }
   return view.kind === 'grid' ? loadGrid(p, view.workspaceId, isShown) : loadThing(p, view.thingId, isShown);
 }
 
@@ -427,6 +438,7 @@ export async function refreshView(p: Ports): Promise<void> {
  */
 export async function unfilledPage(p: Ports): Promise<AskTarget | null> {
   const { view, cache, load, blocked } = await readSnapshot(p);
+  if (view.kind === 'inbox') return null;
   if (blocked === null && load.error === null && !load.isNotConnected) return null;
   if (view.kind === 'search') {
     return view.query && searchOf(cache, view.query) === null ? { kind: 'search', query: view.query } : null;
@@ -443,9 +455,25 @@ export async function unfilledPage(p: Ports): Promise<AskTarget | null> {
  * Refresh and Retry: one read, blocked or not, however fresh the page. The
  * one way out of blocked mode. The person asked for this read, so a refusal
  * shows the note again, even after Dismiss, to say why nothing changed.
+ * Then the band's counts are read again, even after a refusal of their own
+ * (an inbox screen's read is that one).
  */
 export async function pressRefresh(p: Ports): Promise<void> {
   if (await readView(p, true)) await showNote(p);
+  if ((await p.view.read()).kind !== 'inbox') await refreshInbox(p, [], true);
+}
+
+/**
+ * A press of a count on the band: the pane opens on that list, from what
+ * the band holds, and reads it again. It pauses follow, as a press on a
+ * thing does; a press on a row opens that thing.
+ */
+export async function pressInbox(p: Ports, list: EverythingsInboxList): Promise<void> {
+  await p.openPane();
+  await p.follow.update(() => false);
+  const { workspaceId } = await p.view.read();
+  await show(p, { kind: 'inbox', list, workspaceId });
+  await refreshInbox(p);
 }
 
 /**

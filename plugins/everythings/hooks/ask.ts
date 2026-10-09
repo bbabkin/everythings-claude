@@ -37,6 +37,7 @@ function keyOf(target: AskTarget): string {
 /** The page a view shows, as `asked` names it. */
 export function askKey(view: EverythingsView, cache: EverythingsCache): string {
   if (view.kind === 'search') return keyOf({ kind: 'search', query: view.query });
+  if (view.kind === 'inbox') return `inbox:${view.list}`;
   return view.kind === 'thing'
     ? keyOf({ kind: 'thing', id: view.thingId })
     : keyOf({ kind: 'workspace', id: landingOf(cache, view.workspaceId) });

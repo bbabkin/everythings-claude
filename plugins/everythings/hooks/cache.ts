@@ -696,6 +696,7 @@ export function isWholePage(cache: EverythingsCache, thingId: string): boolean {
 /** What a view draws from the cache, as one string: two caches that give the same draw the same. */
 export function drawnOf(cache: EverythingsCache, view: EverythingsView): string {
   if (view.kind === 'search') return JSON.stringify(searchOf(cache, view.query));
+  if (view.kind === 'inbox') return '';
   return JSON.stringify(view.kind === 'thing' ? pageOf(cache, view.thingId) : gridOf(cache, view.workspaceId));
 }
 

@@ -12,8 +12,10 @@ import type { McpToolResult, RenderSurface } from 'claude-code';
 import type {
   EverythingsBlocked,
   EverythingsCache,
+  EverythingsInbox,
   EverythingsLoad,
   EverythingsView,
+  EverythingsWake,
   EverythingsWrites,
 } from '../types';
 
@@ -63,6 +65,8 @@ export type Ports = {
   fresh: Cell<Record<string, number>>;
   defaultsAsked: Cell<string[]>;
   writes: Cell<EverythingsWrites>;
+  inbox: Cell<EverythingsInbox>;
+  wake: Cell<EverythingsWake>;
   /** `$.clock.now()`: ms since the epoch. */
   now: () => Promise<number>;
   /** `$.mcp.call`: rejects when no server answers under that name. */
@@ -76,6 +80,11 @@ export type Ports = {
   isPaneOpen: () => Promise<boolean>;
   /** `$.prompt.submit` as the person's own words: true once it entered, false when a hook dropped it. */
   askClaude: (text: string) => Promise<boolean>;
+  /**
+   * `$.prompt.submit` framed as the plugin's own message (not the person's
+   * words): the wake on an answer. Resolves once the prompt's turn starts.
+   */
+  wakeSession: (text: string) => Promise<void>;
   /** `$.ui.copy` on the surface a press came from: true when the text reached a clipboard. */
   copy: (text: string, surface: RenderSurface) => Promise<boolean>;
 };

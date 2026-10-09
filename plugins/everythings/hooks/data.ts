@@ -13,12 +13,14 @@ import type {
   EverythingsComment,
   EverythingsComments,
   EverythingsDefaultMark,
+  EverythingsInbox,
   EverythingsLoad,
   EverythingsRowMark,
   EverythingsMark,
   EverythingsRequest,
   EverythingsThingRef,
   EverythingsView,
+  EverythingsWake,
   EverythingsWorkspace,
   EverythingsWrites,
 } from '../types';
@@ -68,6 +70,15 @@ export const READ_TOOLS = {
   defaults: 'get_workspace',
   search: 'search_things',
 } as const;
+
+/**
+ * The band's reads (inbox.ts): open questions, and open @Agent jobs. The wake
+ * poll calls list_requests too, for answered ones.
+ */
+export const INBOX_TOOLS = { questions: 'list_requests', jobs: 'list_mentions' } as const;
+
+export const IDLE_INBOX: EverythingsInbox = { questions: null, jobs: null, isRefused: false };
+export const IDLE_WAKE: EverythingsWake = { waits: [], woke: [], isStopped: false };
 
 /**
  * The writes the pane makes, each only on the person's own action: their
@@ -142,6 +153,7 @@ export type WriteTarget = { kind: 'open'; thingId: string } | { kind: 'deleted';
 
 export function viewKey(view: EverythingsView): string {
   if (view.kind === 'search') return `search:${searchKey(view.query)}`;
+  if (view.kind === 'inbox') return `inbox:${view.list}`;
   return view.kind === 'grid' ? `grid:${view.workspaceId ?? ''}` : `thing:${view.thingId}`;
 }
 
@@ -205,7 +217,15 @@ function blocksJson(blocks: unknown[]): unknown {
  * read. Null when none of them holds a JSON object.
  */
 export function answerData(ran: ToolCallResult): Record<string, unknown> | null {
-  const result: unknown = ran.result;
+  return outputData(ran.result, ran.text);
+}
+
+/**
+ * The JSON answer in a tool's stored result (`ToolCallResult.result`, a
+ * transcript row's `output`), else in the text the model read. Null when
+ * neither holds a JSON object.
+ */
+export function outputData(result: unknown, text?: unknown): Record<string, unknown> | null {
   const candidates: unknown[] = [];
   if (isRecord(result)) {
     candidates.push(result.structuredContent);
@@ -214,7 +234,7 @@ export function answerData(ran: ToolCallResult): Record<string, unknown> | null 
   }
   if (Array.isArray(result)) candidates.push(blocksJson(result));
   if (typeof result === 'string') candidates.push(parseJson(result));
-  if (typeof ran.text === 'string') candidates.push(parseJson(ran.text));
+  if (typeof text === 'string') candidates.push(parseJson(text));
   for (const one of candidates) if (isRecord(one)) return one;
   return null;
 }

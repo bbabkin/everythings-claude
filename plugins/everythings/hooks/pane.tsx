@@ -6,7 +6,10 @@
 // rules, dismiss a note, and ask Claude to open a page. An agent's question
 // shows with its options and answer; the person answers it in the app. A
 // section nobody has read yet is absent. A search (`/findthing`) draws its
-// hits as a list of rows, each naming its workspace.
+// hits as a list of rows, each naming its workspace. An inbox screen (a
+// press of a count on the band above the prompt) lists the open questions
+// or the open @Agent jobs as rows, a press opening the thing. drawBand draws
+// that band.
 //
 // register.tsx's `ui.render` hook calls drawPane with the surface's element
 // table, a snapshot of the state, and the actions its presses run.
@@ -16,6 +19,8 @@ import type { ElementTable, RenderElement, RenderSurface } from 'claude-code';
 import type {
   EverythingsBlocked,
   EverythingsDefaultMark,
+  EverythingsInbox,
+  EverythingsInboxList,
   EverythingsRequest,
   EverythingsThingRef,
   EverythingsWrites,
@@ -23,6 +28,7 @@ import type {
 import { askClaude, askKey, type AskTarget } from './ask';
 import { copyRules, dismissNote } from './blocked';
 import { gridOf, pageOf, searchOf } from './cache';
+import { countsOf, countText } from './inbox';
 import {
   clip,
   NO_EMOJI,
@@ -109,6 +115,14 @@ export const SEARCH_UNRUN = 'Claude has not run this search in this chat yet.';
 export const SEARCH_ASKED = 'Asked Claude to search. The list fills in once Claude searches.';
 export const SEARCHING = 'Searching…';
 export const NO_HITS = 'No things match.';
+/** An inbox screen's title, and what it says with nothing to list. */
+export const INBOX_TITLE: Record<EverythingsInboxList, string> = { questions: 'Open questions', jobs: 'Open @Agent jobs' };
+export const INBOX_EMPTY: Record<EverythingsInboxList, string> = {
+  questions: 'No open questions.',
+  jobs: 'No open @Agent jobs.',
+};
+export const INBOX_REFUSED = "Claude Code's permission mode blocked the pane's read of this list.";
+export const INBOX_UNREAD = 'This list has not been read yet in this session.';
 
 /** The Button back to the workspace's grid: a grid of nine dots. */
 export const GRID_GLYPH = '⋮⋮⋮';
@@ -212,6 +226,7 @@ export function drawPane(
       {landing !== null && hasData && drawGrid(els, surface, landing, act)}
       {page !== null && drawThing(els, surface, page, writes, canAsk, isAsked, act)}
       {view.kind === 'search' && drawSearch(els, surface, snap, search, unseen !== null || failure !== null, act)}
+      {view.kind === 'inbox' && drawInbox(els, surface, view.list, snap.inbox, act)}
       {failure !== null && (
         <Box flexDirection="row" columnGap={1}>
           <Text dimColor>{hasData ? `${FROM_CALLS} ${failure}` : failure}</Text>
@@ -239,7 +254,14 @@ function drawHeader(
   const picked = workspaces.some(ws => ws.id === current) ? (current ?? undefined) : undefined;
 
   let left: RenderElement | null = null;
-  if (view.kind === 'search') {
+  if (view.kind === 'inbox') {
+    left = (
+      <Box flexDirection="row" columnGap={1} alignItems="center">
+        <Button key="back" label={GRID_GLYPH} onPress={act.back} />
+        <Text bold>{INBOX_TITLE[view.list]}</Text>
+      </Box>
+    );
+  } else if (view.kind === 'search') {
     left = (
       <Box flexDirection="row" columnGap={1} alignItems="center">
         <Button key="back" label={GRID_GLYPH} onPress={act.back} />
@@ -441,7 +463,7 @@ function drawRows(
   els: ElementTable,
   surface: RenderSurface,
   list: { key: string; prefix: string },
-  rows: { id: string; label: string }[],
+  rows: { id: string; label: string; key?: string }[],
   act: PaneActions,
 ): RenderElement {
   const { Box, Button } = els;
@@ -449,9 +471,9 @@ function drawRows(
     <Box key={list.key} flexDirection="column" alignItems="stretch" rowGap={1} paddingTop={1}>
       {rows.map(row =>
         surface === 'terminal' ? (
-          <Button key={`${list.prefix}:${row.id}`} plain label={row.label} onPress={() => act.openThing(row.id)} />
+          <Button key={`${list.prefix}:${row.key ?? row.id}`} plain label={row.label} onPress={() => act.openThing(row.id)} />
         ) : (
-          <Button key={`${list.prefix}:${row.id}`} label={row.label} onPress={() => act.openThing(row.id)} />
+          <Button key={`${list.prefix}:${row.key ?? row.id}`} label={row.label} onPress={() => act.openThing(row.id)} />
         ),
       )}
     </Box>
@@ -491,6 +513,63 @@ function drawSearch(
     <Box flexDirection="column">
       {drawRows(els, surface, { key: 'hits', prefix: 'hit' }, rows, act)}
       {search.truncated && <Text dimColor>{`Showing ${search.hits.length} of ${search.count}.`}</Text>}
+    </Box>
+  );
+}
+
+/** The most of an item's question or comment a row shows. */
+const INBOX_TEXT_CELLS = 120;
+
+/**
+ * An inbox screen: the band's list as rows, drawn as a search's hits are,
+ * each the thing's emoji and name, its workspace, then the question or the
+ * comment on one line. A press opens the thing. A list not known yet says why.
+ */
+function drawInbox(
+  els: ElementTable,
+  surface: RenderSurface,
+  list: EverythingsInboxList,
+  inbox: EverythingsInbox,
+  act: PaneActions,
+): RenderElement {
+  const { Text } = els;
+  const items = inbox[list];
+  if (items === null) return <Text dimColor>{inbox.isRefused ? INBOX_REFUSED : INBOX_UNREAD}</Text>;
+  if (items.length === 0) return <Text dimColor>{INBOX_EMPTY[list]}</Text>;
+  const rows = items.map(item => {
+    const where = item.workspaceName !== null ? ` · ${item.workspaceName}` : '';
+    const text = item.text !== '' ? `: ${clip(item.text, INBOX_TEXT_CELLS)}` : '';
+    return { id: item.thingId, key: item.key, label: `${label(item.emoji, item.name)}${where}${text}` };
+  });
+  return drawRows(els, surface, { key: `inbox-${list}`, prefix: list === 'questions' ? 'question' : 'job' }, rows, act);
+}
+
+/** What a press of a count on the band does: the pane opens on that list. */
+export type BandActions = { open: (list: EverythingsInboxList) => void };
+
+/** The band's Button label for a count. */
+export function bandLabel(list: EverythingsInboxList, count: number): string {
+  const n = countText(count);
+  return list === 'questions'
+    ? `❓ ${n} open question${count === 1 ? '' : 's'}`
+    : `🤖 ${n} @Agent job${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * The band above the prompt: a Button per count above zero. Null when both
+ * are zero or unknown, so the hook leaves the band to the engine.
+ */
+export function drawBand(els: ElementTable, inbox: EverythingsInbox, act: BandActions): RenderElement | null {
+  const { Box, Text, Button } = els;
+  const counts = countsOf(inbox);
+  const shown = (['questions', 'jobs'] as const).filter(list => (counts[list] ?? 0) > 0);
+  if (shown.length === 0) return null;
+  return (
+    <Box flexDirection="row" flexWrap="wrap" columnGap={1} alignItems="center">
+      <Text dimColor>Everythings</Text>
+      {shown.map(list => (
+        <Button key={`inbox-${list}`} label={bandLabel(list, counts[list] ?? 0)} onPress={() => act.open(list)} />
+      ))}
     </Box>
   );
 }

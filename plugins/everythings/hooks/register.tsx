@@ -9,7 +9,9 @@
 // blocked.ts (when Claude Code refuses the pane's calls), ask.ts (asking
 // Claude to open a page or run a search), writes.ts (the person's own mark
 // and comment, the pane's only writes), follow.ts (push follow),
-// showThing.ts (the tool), pane.tsx (the drawing), data.ts (payloads). A
+// inbox.ts (the band above the prompt, and the wake on an answer),
+// showThing.ts (the tool), pane.tsx (the drawing), rows.tsx (the
+// transcript's rows of Everythings writes), data.ts (payloads). A
 // new feature is a file of that kind plus its hook here; the state it reads
 // is declared in ../types/index.d.ts.
 
@@ -18,11 +20,13 @@ import type { EngineInterface, Register, Timer } from 'claude-code';
 
 import { askClaude } from './ask';
 import { EMPTY_CACHE } from './cache';
-import { IDLE_LOAD, IDLE_WRITES, INITIAL_VIEW, PANE_ID, PANE_TITLE } from './data';
+import { IDLE_INBOX, IDLE_LOAD, IDLE_WAKE, IDLE_WRITES, INITIAL_VIEW, PANE_ID, PANE_TITLE } from './data';
 import { observeCall } from './follow';
-import { readSnapshot, refreshView, resumeFollow, runSearch, unfilledPage } from './nav';
-import { drawPane, paneActions } from './pane';
+import { isWaiting, pollAnswers, refreshInbox, WAKE_POLL_MS, watchAsk } from './inbox';
+import { pressInbox, readSnapshot, refreshView, resumeFollow, runSearch, unfilledPage } from './nav';
+import { drawBand, drawPane, paneActions } from './pane';
 import { cellOf, type Ports } from './ports';
+import { drawRow, judgeRow, writeRow } from './rows';
 import { SHOW_THING, showThing } from './showThing';
 
 const viewAtom = atom({ plugin: 'everythings', key: 'view' } as const, INITIAL_VIEW);
@@ -38,6 +42,8 @@ const askedAtom = atom({ plugin: 'everythings', key: 'asked' } as const, null);
 const freshAtom = atom({ plugin: 'everythings', key: 'fresh' } as const, {});
 const defaultsAskedAtom = atom({ plugin: 'everythings', key: 'defaultsAsked' } as const, []);
 const writesAtom = atom({ plugin: 'everythings', key: 'writes' } as const, IDLE_WRITES, { shape: 'v2' });
+const inboxAtom = atom({ plugin: 'everythings', key: 'inbox' } as const, IDLE_INBOX);
+const wakeAtom = atom({ plugin: 'everythings', key: 'wake' } as const, IDLE_WAKE);
 
 /** The engine, as the logic files may use it. A write that changes nothing is skipped (cellOf). */
 function ports($: EngineInterface): Ports {
@@ -88,6 +94,14 @@ function ports($: EngineInterface): Ports {
       () => read($, writesAtom),
       change => update($, writesAtom, change),
     ),
+    inbox: cellOf(
+      () => read($, inboxAtom),
+      change => update($, inboxAtom, change),
+    ),
+    wake: cellOf(
+      () => read($, wakeAtom),
+      change => update($, wakeAtom, change),
+    ),
     now: () => $.clock.now(),
     mcpCall: (server, tool, args) => $.mcp.call(server, tool, args),
     mcpConnect: async server => {
@@ -101,6 +115,7 @@ function ports($: EngineInterface): Ports {
     openPane: async () => void (await $.ui.open({ id: PANE_ID, title: PANE_TITLE })),
     isPaneOpen: async () => (await $.ui.panes()).some(pane => pane.id === PANE_ID),
     askClaude: async text => (await $.prompt.submit({ text, asUser: true })).drop === undefined,
+    wakeSession: async text => void (await $.prompt.submit({ text })),
     copy: async (text, surface) => (await $.ui.copy({ text, surface })).isCopied,
   };
 }
@@ -117,7 +132,13 @@ export const register: Register = on => {
       argumentHint: '<query>',
     });
     await $.tool.register(SHOW_THING);
-    return next(e);
+    const started = await next(e);
+    // The band's counts, read once the session is up, on the server an earlier session learned; left running.
+    const p = ports($);
+    void refreshInbox(p).catch(() => undefined);
+    // After a hot reload the poll's timer is gone; a question still waited on starts it again.
+    if (await isWaiting(p)) startPoll($);
+    return started;
   });
 
   // `/things` opens the pane on the view it last showed, arms follow,
@@ -164,7 +185,7 @@ export const register: Register = on => {
   on(
     'tool.call',
     {
-      tool: /^mcp__.+__(?:what_changed|my_reception|search_things|get_thing|get_thing_view|get_workspace_view|list_things|list_child_things|recent_things|create_thing|update_thing|delete_thing|restore_thing|move_thing|reorder_things|copy_thing|claim_thing|release_thing|request_input|answer_request|resolve_request|list_requests|add_comment|add_mark|remove_mark|resolve_mention|list_workspaces|get_workspace|list_comments|list_marks|create_workspace|rename_workspace)$/,
+      tool: /^mcp__.+__(?:what_changed|my_reception|search_things|get_thing|get_thing_view|get_workspace_view|list_things|list_child_things|recent_things|create_thing|update_thing|delete_thing|restore_thing|move_thing|reorder_things|copy_thing|claim_thing|release_thing|request_input|answer_request|resolve_request|list_requests|list_mentions|add_comment|add_mark|remove_mark|resolve_mention|list_workspaces|get_workspace|list_comments|list_marks|create_workspace|rename_workspace)$/,
     },
     async ($, e, next) => {
       const ran = await next(e);
@@ -173,9 +194,77 @@ export const register: Register = on => {
       } catch {
         // Follow is a convenience; the call's own result is what matters.
       }
+      try {
+        // The session's own question: the wake poll waits on it.
+        if (await watchAsk(ports($), e.tool, ran)) startPoll($);
+      } catch {
+        // The question goes unwatched; the person's answer still reaches the agent's next run.
+      }
       return ran;
     },
   );
+
+  // Transcript rows: a resolved Everythings write reads as one compact row
+  // ("updated 🍋 Lemon cake", the name a Link to the thing in the app), and
+  // the result block under it draws nothing (rows.tsx). The matchers admit
+  // the write tools of ROW_VERBS alone, on any server; rows.tsx then tells
+  // an Everythings server as follow does. An errored, running or
+  // interrupted call, or one rows.tsx cannot judge, keeps the engine's row.
+  on(
+    'ui.render',
+    {
+      component: 'ToolUse',
+      props: {
+        tool: /^mcp__.+__(?:create_thing|update_thing|move_thing|delete_thing|restore_thing|copy_thing|add_mark|remove_mark|add_comment|request_input)$/,
+      },
+    },
+    async ($, e, next) => {
+      try {
+        const row = await writeRow(ports($), e.props);
+        if (row) return drawRow($.ui.resolve(e), row);
+      } catch {
+        // A row the mod cannot draw is the engine's.
+      }
+      return next(e);
+    },
+  );
+  on(
+    'ui.render',
+    {
+      component: 'ToolResult',
+      props: {
+        tool: /^mcp__.+__(?:create_thing|update_thing|move_thing|delete_thing|restore_thing|copy_thing|add_mark|remove_mark|add_comment|request_input)$/,
+      },
+    },
+    async ($, e, next) => {
+      try {
+        if (await judgeRow(ports($), e.props.tool, e.props.isErrored, e.props.output)) {
+          const { Box } = $.ui.resolve(e);
+          return <Box />;
+        }
+      } catch {
+        // The engine's own result block.
+      }
+      return next(e);
+    },
+  );
+
+  // The band above the prompt: the open questions and @Agent jobs, a Button
+  // each, hidden at zero (inbox.ts). A press opens the pane on that list. A
+  // survey holds the band, and the mod yields it.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e);
+    try {
+      const p = ports($);
+      const band = drawBand($.ui.resolve(e), await p.inbox.read(), {
+        open: list => void pressInbox(p, list).catch(() => undefined),
+      });
+      if (band !== null) return band;
+    } catch {
+      // The band is the engine's.
+    }
+    return next(e);
+  });
 
   on('ui.render', { component: 'Pane', requestId: 'everythings' }, async ($, e) => {
     const p = ports($);
@@ -220,6 +309,39 @@ async function askIfUnfilled($: EngineInterface): Promise<void> {
     if (target !== null) await askClaude(p, target);
   } catch {
     // The pane keeps its notice and the ask Button.
+  }
+}
+
+/**
+ * The wake poll: the mod's one repeating timer. It runs while a question
+ * this session asked is waited on, every WAKE_POLL_MS, and stops itself when
+ * none is left (answered, past its two hours, or a refused poll). A period
+ * that comes while the last still runs does nothing.
+ */
+let poll: Timer | null = null;
+let isPolling = false;
+
+function startPoll($: EngineInterface): void {
+  if (poll !== null) return;
+  poll = $.clock.every(WAKE_POLL_MS, () => void pollOnce($));
+}
+
+async function pollOnce($: EngineInterface): Promise<void> {
+  if (isPolling) return;
+  isPolling = true;
+  let goesOn = true;
+  try {
+    goesOn = await pollAnswers(ports($));
+  } catch {
+    // The next period asks again.
+  } finally {
+    isPolling = false;
+  }
+  if (!goesOn) {
+    poll?.cancel();
+    poll = null;
+    // A question asked while this period ran starts the poll again.
+    if (await isWaiting(ports($)).catch(() => false)) startPoll($);
   }
 }
 

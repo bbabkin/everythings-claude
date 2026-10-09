@@ -9,10 +9,12 @@
 // keeps it quietly.
 //
 // While blocked, the pane shows one note: why it draws only what Claude has
-// read, and the permission rules for its four read tools, with a Button that
+// read, and the permission rules for its six read tools, with a Button that
 // copies them. An allow rule for the two page reads was seen to lift the
 // refusal. The search's rule is there too though a refused search blocks
-// nothing (nav.ts): one copy then lets `/findthing` run as well. A refusal
+// nothing (nav.ts): one copy then lets `/findthing` run as well. So are the
+// band's two (list_requests, list_mentions), whose refusal stops only the
+// band's reads and the wake poll (inbox.ts). A refusal
 // of a write (writes.ts) shows the same kind of note with that write's
 // rules, beside the reads' note. The reads' note's Dismiss holds for the
 // session (`$.state`) and for later sessions (`$.store`), until a Refresh
@@ -21,20 +23,30 @@
 
 import type { RenderSurface } from 'claude-code';
 
-import { READ_TOOLS, WRITE_TOOLS } from './data';
+import { INBOX_TOOLS, READ_TOOLS, WRITE_TOOLS } from './data';
 import type { Ports } from './ports';
 import type { RefusedError } from './server';
 
 const NOTE_DISMISSED = 'readsNoteDismissed';
 
-const PANE_TOOLS = [...Object.values(READ_TOOLS), ...Object.values(WRITE_TOOLS)]
+const PANE_TOOLS = [...Object.values(READ_TOOLS), ...Object.values(INBOX_TOOLS), ...Object.values(WRITE_TOOLS)]
   .sort((a, b) => b.length - a.length)
   .join('|');
 /** A tool name the engine's refusal named, which gives the server as permission rules spell it. */
 const NAMED_TOOL = new RegExp(`\\bmcp__([A-Za-z0-9_-]+?)__(?:${PANE_TOOLS})\\b`);
 
-/** The read tools the note asks to allow: every read the pane makes, so one copy covers the whole pane. */
-export const READ_RULE_TOOLS: readonly string[] = [READ_TOOLS.thing, READ_TOOLS.grid, READ_TOOLS.defaults, READ_TOOLS.search];
+/**
+ * The read tools the note asks to allow: every read the mod makes, so one
+ * copy covers the whole pane, the band above the prompt and the wake poll.
+ */
+export const READ_RULE_TOOLS: readonly string[] = [
+  READ_TOOLS.thing,
+  READ_TOOLS.grid,
+  READ_TOOLS.defaults,
+  READ_TOOLS.search,
+  INBOX_TOOLS.questions,
+  INBOX_TOOLS.jobs,
+];
 
 /**
  * The allow rules for `tools` on the server that refused. The server part

@@ -17,6 +17,7 @@ import {
   UNIQUE_TOOLS,
   writeTarget,
 } from './data';
+import { recordInboxCall, refreshInbox } from './inbox';
 import { agentCompletedView, followWrite, forgetFresh, refreshView } from './nav';
 import type { Ports } from './ports';
 import { isLearnedServer, learnServer } from './server';
@@ -33,7 +34,8 @@ import { isLearnedServer, learnServer } from './server';
  * result, a whole page from get_thing_view. Then a followed write points the
  * pane at what it touched, and one read of the pane's own tries to complete
  * the page, unless Claude Code refuses the pane's reads (blocked.ts). That
- * read is left running, so the agent's call never waits on it.
+ * read is left running, so the agent's call never waits on it, as are the
+ * band's reads of its counts (inbox.ts), which follow every such call.
  */
 export async function observeCall(
   p: Ports,
@@ -51,6 +53,9 @@ export async function observeCall(
   const pinned = view.kind === 'thing' ? view.thingId : null;
   await p.cache.update(cache => recordCall(cache, parts.name, args, data, pinned));
   await agentCompletedView(p, parts.name, args, data);
+  // The band's counts: what this call listed whole, then one read of each list it did not, left running.
+  const listed = await recordInboxCall(p, parts.name, args, data);
+  void refreshInbox(p, listed).catch(() => undefined);
 
   // Any write may have changed pages the cache cannot patch: none counts as fresh now.
   if (!READ_ONLY_TOOLS.has(parts.name)) await forgetFresh(p);
